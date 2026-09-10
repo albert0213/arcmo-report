@@ -2338,6 +2338,8 @@ $('#btnClearCache').onclick = async ()=>{
 .navitem[data-go="manage"],.navitem[data-go="analysis"],.navitem[data-go="settings"],
 #btnLogout,#connBox,#hpAnalyze,#hpEdit,
 .fcard[data-f="manage"],.fcard[data-f="analysis"]{display:none!important}
+/* 기록 목록 오른쪽의 머리고정 점수는 숨깁니다 — 리포트를 열면 그대로 보입니다. */
+.rrow .sc{display:none!important}
 #pubBar{
   position:sticky;top:0;z-index:40;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
   padding:8px 14px;font-size:12.5px;line-height:1.5;
