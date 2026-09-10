@@ -2462,6 +2462,11 @@ $('#btnClearCache').onclick = async ()=>{
     };
   }
 
+  /* 들어온 주소의 ?p·?r 은 여기서 한 번 읽어 둡니다.
+     아래 go 래퍼가 주소를 지우기 때문에, 부팅이 끝난 뒤 읽으면 이미 비어 있습니다. */
+  var Q = new URLSearchParams(location.search);
+  var LINK_PID = Q.get('p'), LINK_RID = Q.get('r');
+
   /* ── 리포트를 열 때 주소창에도 남깁니다 (공유용) ── */
   var origOpen = window.openReport;
   window.openReport = function(pid, rid){
@@ -2470,6 +2475,14 @@ $('#btnClearCache').onclick = async ()=>{
         + '?p=' + encodeURIComponent(pid) + '&r=' + encodeURIComponent(rid));
     }catch(e){}
     return origOpen.apply(this, arguments);
+  };
+
+  /* 홈으로 돌아가면 주소도 되돌립니다 — 새로고침했을 때 아까 본 리포트가 아니라
+     선수 목록에서 다시 시작하도록. */
+  var origGo = window.go;
+  window.go = function(view){
+    if (view === 'home'){ try{ history.replaceState(null, '', location.pathname); }catch(e){} }
+    return origGo.apply(this, arguments);
   };
 
   /* ── 부팅 ── */
@@ -2489,17 +2502,14 @@ $('#btnClearCache').onclick = async ()=>{
     await bootstrap();
     mountBar();
 
-    var q = new URLSearchParams(location.search);
-    var pid = q.get('p'), rid = q.get('r');
-    var first = MF.reports[0];
-    if (!pid && first){ pid = first.player_id; }
-
-    var p = pid && playerById(pid);
+    /* 링크(?p·?r)로 들어왔을 때만 그 선수를 펴 줍니다.
+       그냥 들어오면 선수 목록에서 시작합니다 — 아무나 한 명이 열려 있으면 오해를 삽니다. */
+    var p = LINK_PID && playerById(LINK_PID);
     if (p){
       S.home.team = p.team;
       renderHome();
       await selectHomePlayer(p.id);
-      if (rid) openReport(pid, rid);
+      if (LINK_RID) openReport(LINK_PID, LINK_RID);
     }
   })();
 })();
