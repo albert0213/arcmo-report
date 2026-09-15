@@ -1597,7 +1597,10 @@ async function toggleSessionRec(){
     }
     renderSessionPanel();
   }catch(e){
-    toast('녹화 제어 실패: ' + e.message, 3200);
+    // 404 = 서버에 연속 스윙 촬영 API 가 없음 → 이 기능이 생기기 전에 켠 server.py 가 떠 있는 경우
+    toast(e.status === 404
+      ? '분석PC의 서버가 이전 버전입니다. server.py 를 껐다가 다시 켜세요 (연속 스윙 촬영 API 없음)'
+      : '녹화 제어 실패: ' + e.message, 5000);
   }finally{
     S.ses.busy = false; btn.disabled = false; S.ses.seq++;
     updateSessionHint();
