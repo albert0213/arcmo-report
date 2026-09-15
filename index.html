@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Arcmo 리포트 · 2026.09.10</title>
+<title>Arcmo 리포트 · 2026.09.10 · 2026.09.15</title>
 <style>
 :root{
   --bg:#eef0f4; --surface:#ffffff; --surface2:#f7f8fa; --surface3:#eceef2;
@@ -157,7 +157,11 @@ details.adv[open] summary::before{transform:rotate(90deg)}
 main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .view{display:none;flex:1;min-height:0;flex-direction:column;overflow:auto;-webkit-overflow-scrolling:touch}
 .view.on{display:flex}
-#v-capture,#v-collect{overflow:hidden}
+#v-capture,#v-collect,#v-session{overflow:hidden}
+.sstatus{flex:1;min-width:0;font-size:13px;color:var(--ink2);line-height:1.4}
+.cstrip .pill{flex:none}
+.rrow.folder .go{transition:transform .15s}
+.rrow.child{padding-left:34px;background:var(--surface2)}
 .pad{padding:16px}
 .maxw{width:100%;max-width:1180px;margin:0 auto}
 
@@ -636,6 +640,32 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
       </div>
     </section>
 
+    <!-- ── 연속 스윙 촬영: 한 번 길게 찍고 타격음마다 잘라 스윙별 분석 ── -->
+    <section class="view" id="v-session">
+      <div class="stage">
+        <img id="sPreview" alt="">
+        <div class="ph" id="sPreviewPh">카메라 연결을 확인하는 중…</div>
+        <div class="recbadge" id="sRecBadge"><i></i> 녹화 중</div>
+        <div class="cstat" id="sStat"></div>
+      </div>
+      <div class="ctools">
+        <span class="sstatus" id="sStatus"></span>
+        <button class="btn sm" id="sGoRecords">기록 보기</button>
+      </div>
+      <div class="cstrip" id="sStrip"></div>
+      <div class="capbar">
+        <div class="col" style="gap:2px">
+          <span class="timer" id="sTimer">0:00</span>
+          <span class="dim" style="font-size:12px" id="sWho"></span>
+        </div>
+        <button class="reccircle" id="sBtnRec" aria-label="녹화"><i></i></button>
+        <div class="col" style="gap:2px;align-items:flex-end">
+          <span class="ccount">스윙 <b id="sCount">0</b>개</span>
+          <span class="dim" style="font-size:12px;text-align:right" id="sHint">녹화를 시작하고 스윙을 이어서 하세요</span>
+        </div>
+      </div>
+    </section>
+
     <!-- ── 수집 영상 목록 · 나중에 분석 ── -->
     <section class="view" id="v-clips"><div id="clipsRoot"></div></section>
 
@@ -822,7 +852,7 @@ async function pingLoop(){
 /* ═══════════ 네비게이션 ═══════════ */
 const TITLES = { home:'홈', manage:'팀 / 선수 관리', analysis:'타격 분석', capture:'촬영',
                  progress:'분석 진행', report:'리포트', detail:'상세', settings:'설정',
-                 collect:'데이터 수집', clips:'수집 영상' };
+                 collect:'데이터 수집', clips:'수집 영상', session:'연속 스윙 촬영' };
 
 function setDrawer(on){
   $('#drawer').classList.toggle('on', on);
@@ -834,6 +864,7 @@ $('#scrim').onclick   = ()=> setDrawer(false);
 function go(view, silent){
   if (S.view === 'capture' && view !== 'capture') stopPreview();
   if (S.view === 'collect' && view !== 'collect') stopCollectPreview();
+  if (S.view === 'session' && view !== 'session') stopSessionPreview();
   if (view !== S.view) stopAllPlayers();
   S.view = view;
   $$('.view').forEach(v=>v.classList.toggle('on', v.id === 'v-'+view));
@@ -847,6 +878,7 @@ function go(view, silent){
 $$('.navitem[data-go]').forEach(b => b.onclick = ()=>{
   const v = b.dataset.go;
   if (S.col && S.col.recording && v !== 'collect'){ setDrawer(false); toast('녹화를 먼저 중지하세요'); return; }
+  if (S.ses && S.ses.recording){ setDrawer(false); toast('녹화를 먼저 중지하세요'); return; }
   S.repBack = null;
   if (v==='collect'){ enterCollect(); return; }
   if (v==='clips'){ enterClips(); return; }
@@ -859,7 +891,7 @@ $$('.navitem[data-go]').forEach(b => b.onclick = ()=>{
 function updateBack(){
   const mobile = window.matchMedia('(max-width:899px)').matches;
   let show = false;
-  if (['report','detail','progress','capture'].includes(S.view)) show = true;
+  if (['report','detail','progress','capture','session'].includes(S.view)) show = true;
   else if (mobile && S.view==='home' && S.home.player) show = true;
   else if (mobile && S.view==='analysis' && S.ana.player) show = true;
   else if (mobile && S.view==='manage' && S.manage.team) show = true;
@@ -868,6 +900,8 @@ function updateBack(){
 $('#btnBack').onclick = ()=>{
   if (S.view==='detail'){ go('report'); return; }
   if (S.view==='report' && S.repBack==='clips'){ S.repBack = null; enterClips(); return; }
+  if (S.view==='report' && S.repBack==='session'){ S.repBack = null; enterSession(); return; }
+  if (S.view==='session'){ if (S.ses.recording){ toast('녹화를 먼저 중지하세요'); return; } go('analysis'); return; }
   if (S.view==='report'){ renderHome(); go('home'); return; }
   if (S.view==='progress'){ go('capture'); startPreview(); return; }
   if (S.view==='capture'){ if(!confirmLeaveCapture()) return; go('analysis'); return; }
@@ -994,22 +1028,51 @@ function renderReportList(){
       + '<div style="margin-top:4px">위의 “분석하기”로 첫 촬영을 시작하세요.</div></div>';
     return;
   }
-  const rows = st.reports.map(r=>{
+  const rowHTML = (r, child)=>{
     const tags = (r.items||[]).map(t=>'<span class="pill">'+esc(t)+'</span>').join('');
     const stt = r.is_complete ? '<span class="pill ok">완료</span>'
               : (r.has_summary ? '<span class="pill run">중단됨</span>' : '<span class="pill bad">미완</span>');
     const hs = r.head_stability!=null ? r.head_stability.toFixed(1) : '-';
-    return '<button class="rrow" data-open="'+esc(r.report_id)+'">'
-      + '<span class="d"><b>'+esc(r.date||'-')+'</b><span>'+esc(r.report_id)+'</span></span>'
+    const sub = child && r.session ? ('#'+r.session.index+' · '+r.report_id) : r.report_id;
+    return '<button class="rrow'+(child?' child':'')+'" data-open="'+esc(r.report_id)+'">'
+      + '<span class="d"><b>'+esc(r.date||'-')+'</b><span>'+esc(sub)+'</span></span>'
       + '<span class="tags grow">'+(tags||'<span class="dim">항목 없음</span>')+'</span>'
       + '<span class="sc"><b>'+hs+'</b><span>머리고정</span></span>'
       + '<span class="d" style="min-width:auto">'+stt+'</span>'
       + '<svg class="i go" viewBox="0 0 24 24" style="width:17px"><path d="M9 5l7 7-7 7"/></svg>'
       + '</button>';
-  }).join('');
+  };
+  /* 연속 스윙 촬영으로 만든 리포트는 한 폴더로 묶습니다 (가장 최근 스윙 자리에). */
+  const open = st.openFolders || (st.openFolders = new Set());
+  const seen = new Set();
+  let rows = '';
+  st.reports.forEach(r=>{
+    const s = r.session;
+    if (!s || !s.id){ rows += rowHTML(r, false); return; }
+    if (seen.has(s.id)) return;
+    seen.add(s.id);
+    const kids = st.reports.filter(x => x.session && x.session.id === s.id)
+                           .sort((a,b)=> (a.session.index||0) - (b.session.index||0));
+    const done = kids.filter(x => x.is_complete).length;
+    const on = open.has(s.id);
+    rows += '<button class="rrow folder" data-folder="'+esc(s.id)+'">'
+      + '<span class="d"><b>'+esc(kids[0].date||'-')+'</b><span>'+esc(clipTime(s.id))+' 촬영</span></span>'
+      + '<span class="tags grow"><span class="pill">연속 스윙 '+kids.length+'개</span>'
+      + (s.count && s.count > kids.length ? '<span class="dim" style="font-size:12px">'+(s.count - kids.length)+'개 분석 전</span>' : '')
+      + '</span>'
+      + '<span class="d" style="min-width:auto"><span class="pill '+(done===kids.length?'ok':'run')+'">완료 '+done+'/'+kids.length+'</span></span>'
+      + '<svg class="i go" viewBox="0 0 24 24" style="width:17px'+(on?';transform:rotate(90deg)':'')+'"><path d="M9 5l7 7-7 7"/></svg>'
+      + '</button>';
+    if (on) rows += kids.map(k => rowHTML(k, true)).join('');
+  });
   host.innerHTML = '<div class="pad" style="padding-top:14px"><div class="sect-t">분석 기록 '+st.reports.length+'건</div>'
     + '<div class="card" style="overflow:hidden">'+rows+'</div></div>';
   $$('#repList [data-open]').forEach(b => b.onclick = ()=> openReport(S.home.player, b.dataset.open));
+  $$('#repList [data-folder]').forEach(b => b.onclick = ()=>{
+    const id = b.dataset.folder;
+    if (open.has(id)) open.delete(id); else open.add(id);
+    renderReportList();
+  });
 }
 
 function featureGridHTML(){
@@ -1254,7 +1317,23 @@ function renderAnaRight(){
     if (st.items.has(k)) st.items.delete(k); else st.items.add(k);
     renderAnaRight();
   });
-  $('#anaGoCap').onclick = ()=> enterCapture();
+  $('#anaGoCap').onclick = ()=> chooseCaptureMode();
+}
+
+/* 촬영 방식 — 한 스윙(기존) / 연속 스윙(한 번 길게 찍고 타격음마다 잘라 분석) */
+function chooseCaptureMode(){
+  const card = (mode, icon, t, s) => '<button class="fcard" data-mode="'+mode+'"><span class="ic">'+icon+'</span><b>'+t+'</b><span>'+s+'</span></button>';
+  openSheet('<h3>촬영 방식</h3>'
+    + '<div class="fgrid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">'
+    + card('single', '<svg class="i lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+           '한 스윙 촬영', '스윙 한 번을 찍고 바로 분석합니다.')
+    + card('session', '<svg class="i lg" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/><path d="M6 10h7M6 14h4"/></svg>',
+           '연속 스윙 촬영', '스윙 5~10번을 한 번에 이어서 찍습니다. 타격음마다 잘라 스윙별로 분석하고, 기록은 한 폴더로 묶입니다.')
+    + '</div><div class="acts"><button class="btn" data-close>취소</button></div>');
+  $$('#sheetPanel [data-mode]').forEach(b => b.onclick = ()=>{
+    closeSheet();
+    if (b.dataset.mode === 'session') enterSession(); else enterCapture();
+  });
 }
 $('#anaTeamBtn').onclick = ()=> pickTeam(S.ana.team, t=>{ S.ana.team=t; S.ana.player=null; S.ana.q=''; $('#anaSearch').value=''; renderAna(); });
 $('#anaSearch').oninput = e => { S.ana.q = e.target.value; $('#anaPlayers').innerHTML = playerListHTML(S.ana.team, S.ana.q, S.ana.player);
@@ -1430,6 +1509,212 @@ async function pollJob(want){
 }
 
 $('#progBack').onclick = ()=>{ S.job.stop = true; go('capture'); startPreview(); };
+</script>
+
+<script>
+/* ═══════════ 연속 스윙 촬영 — 한 번 길게 찍고, 타격음마다 잘라 스윙별로 분석 ═══════════
+   서버(session_api)가 저장 → 자르기 → 스윙별 분석을 백그라운드로 합니다.
+   이 화면은 녹화를 켜고 끄고, 진행 상황과 스윙별 리포트 링크를 보여줍니다. */
+S.ses = { recording:false, busy:false, seq:0, t0:0, timer:null, tick:null, limitWarned:false,
+          cur:null, maxSec:300 };
+
+const SES_STATUS = { recording:'녹화 중', saving:'영상 저장 · 타격음 찾는 중', splitting:'스윙 자르는 중',
+                     analyzing:'스윙별 분석 중', done:'완료', failed:'실패', interrupted:'중단됨' };
+
+function sessionBusy(c){ return !!c && ['saving','splitting','analyzing'].includes(c.status); }
+
+function enterSession(){
+  const p = playerById(S.ana.player);
+  if (!p) return;
+  if (!S.ana.items.size){ toast('분석 항목을 하나 이상 고르세요'); return; }
+  $('#sWho').textContent = p.name + ' · ' + Array.from(S.ana.items).join(', ');
+  if (!S.ses.recording) $('#sTimer').textContent = '0:00';
+  if (S.ses.cur && S.ses.cur.player_id !== p.id) S.ses.cur = null;
+  go('session');
+  startSessionPreview();
+  renderSessionPanel();
+  loadLatestSession(p.id).catch(()=>{});
+  syncSessionStatus().catch(()=>{});
+  startSessionTick();
+}
+
+async function loadLatestSession(pid){
+  if (S.ses.cur) return;
+  const r = await api('/api/sessions?limit=1&player_id=' + encodeURIComponent(pid), {timeout:8000});
+  const c = (r.sessions || [])[0];
+  if (c && !S.ses.cur && c.day === todayYmd()){ S.ses.cur = c; renderSessionPanel(); }
+}
+
+function startSessionPreview(){
+  const img = $('#sPreview'), ph = $('#sPreviewPh');
+  ph.textContent = '카메라 화면을 불러오는 중…';
+  ph.style.display = 'grid';
+  img.onload  = ()=>{ ph.style.display = 'none'; };
+  img.onerror = ()=>{ ph.style.display = 'grid'; ph.textContent = '카메라 화면을 받지 못했습니다. 분석PC의 카메라 연결을 확인하세요.'; };
+  img.src = url('/video_feed?ts=' + Date.now());
+}
+function stopSessionPreview(){
+  const img = $('#sPreview');
+  img.removeAttribute('src'); img.onload = img.onerror = null;
+}
+
+function setSessionRecording(on, t0){
+  S.ses.recording = on;
+  $('#sBtnRec').classList.toggle('rec', on);
+  $('#sRecBadge').classList.toggle('on', on);
+  clearInterval(S.ses.timer); S.ses.timer = null;
+  if (on){
+    S.ses.t0 = t0 || Date.now(); S.ses.limitWarned = false;
+    $('#sTimer').textContent = fmtDur(Date.now() - S.ses.t0);
+    S.ses.timer = setInterval(()=>{ $('#sTimer').textContent = fmtDur(Date.now() - S.ses.t0); }, 200);
+  }
+  updateSessionHint();
+}
+
+function updateSessionHint(){
+  $('#sHint').textContent = S.ses.recording ? '스윙을 이어서 하고, 끝나면 정지 (스페이스바)'
+    : sessionBusy(S.ses.cur) ? '처리 중에도 다음 촬영을 시작할 수 있습니다'
+    : '녹화를 시작하고 스윙을 이어서 하세요';
+}
+
+async function toggleSessionRec(){
+  if (S.ses.busy) return;
+  const btn = $('#sBtnRec');
+  S.ses.busy = true; btn.disabled = true; S.ses.seq++;
+  try{
+    if (!S.ses.recording){
+      const r = await api('/api/session/start', {method:'POST', timeout:10000,
+        body:{player_id: S.ana.player, items: Array.from(S.ana.items)}});
+      S.ses.maxSec = r.max_sec || S.ses.maxSec;
+      S.ses.cur = r.session;
+      setSessionRecording(true);
+      if (r.session && r.session.note) toast(r.session.note, 3200);
+    } else {
+      setSessionRecording(false);                 // 응답 전에 먼저 멈춘다 (촬영 화면과 같은 이유)
+      const r = await api('/api/session/stop', {method:'POST', body:{}, timeout:15000});
+      S.ses.cur = r.session || S.ses.cur;
+      if (S.ses.cur) $('#sTimer').textContent = fmtDur((S.ses.cur.requested_duration_sec || 0) * 1000);
+    }
+    renderSessionPanel();
+  }catch(e){
+    toast('녹화 제어 실패: ' + e.message, 3200);
+  }finally{
+    S.ses.busy = false; btn.disabled = false; S.ses.seq++;
+    updateSessionHint();
+  }
+}
+$('#sBtnRec').onclick = e => { e.currentTarget.blur(); toggleSessionRec(); };
+
+document.addEventListener('keydown', e => {
+  if (S.view !== 'session' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if ($('#sheet').classList.contains('on')) return;
+  const tg = e.target;
+  if (tg && /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) return;
+  if ([' ', 'Enter', 'PageDown', 'PageUp'].includes(e.key)){
+    e.preventDefault();
+    toggleSessionRec();
+  }
+});
+
+function renderSessionPanel(){
+  const c = S.ses.cur;
+  const sw = (c && c.swings) || [];
+  $('#sCount').textContent = sw.length;
+  if (!c){
+    $('#sStatus').textContent = '녹화를 멈추면 타격음마다 스윙을 잘라 각각 분석합니다.';
+    $('#sStrip').innerHTML = '';
+    updateSessionHint();
+    return;
+  }
+  const done = sw.filter(s => s.status === 'done').length;
+  const parts = [clipTime(c.session_id) + ' 촬영', SES_STATUS[c.status] || c.status];
+  if (c.take && c.status !== 'recording') parts.push(Number(c.take.duration_sec || 0).toFixed(1) + '초');
+  if (sw.length && ['analyzing','done'].includes(c.status)) parts.push('분석 ' + done + '/' + sw.length);
+  if (c.warning) parts.push(c.warning);
+  if (c.error) parts.push(c.error);
+  $('#sStatus').textContent = parts.join(' · ');
+
+  $('#sStrip').innerHTML = sw.map(s => {
+    const lbl = '#' + s.index;
+    if (s.status === 'done' && s.report_id)
+      return '<button class="pill ok" data-rep="'+esc(s.report_id)+'">'+lbl+' 리포트 ›</button>';
+    if (s.status === 'running')
+      return '<span class="pill run"><span class="spin" style="width:10px;height:10px"></span>'+lbl+' 분석 중</span>';
+    if (s.status === 'failed' || s.status === 'interrupted')
+      return (s.report_id
+        ? '<button class="pill bad" data-rep="'+esc(s.report_id)+'" title="'+esc(s.error||'')+'">'
+        : '<span class="pill bad" title="'+esc(s.error||'')+'">')
+        + lbl + ' ' + (s.status === 'failed' ? '실패' : '중단') + (s.report_id ? ' ›</button>' : '</span>');
+    return '<span class="pill">'+lbl+' '+(s.status === 'cutting' ? '자르는 중' : '분석 대기')+'</span>';
+  }).join('');
+  $$('#sStrip [data-rep]').forEach(b => b.onclick = ()=>{
+    if (S.ses.recording){ toast('녹화를 먼저 중지하세요'); return; }
+    S.repBack = 'session';
+    openReport(c.player_id, b.dataset.rep);
+  });
+  updateSessionHint();
+}
+
+async function refreshSession(sid){
+  const r = await api('/api/sessions/' + encodeURIComponent(sid), {timeout:8000});
+  if (S.ses.cur && S.ses.cur.session_id !== sid) return;   // 그 사이 새 촬영을 시작했다
+  S.ses.cur = r.session;
+  renderSessionPanel();
+}
+
+async function syncSessionStatus(){
+  const seq = S.ses.seq;
+  const r = await api('/api/session/status', {timeout:8000});
+  S.ses.maxSec = r.max_sec || S.ses.maxSec;
+
+  const cap = r.capture || {}, tags = [];
+  if (cap.error) tags.push('<span class="bad">카메라 오류</span>');
+  else if (cap.running){
+    tags.push('<span>' + esc(cap.requested_fps || '-') + 'fps</span>');
+    tags.push(cap.audio_active ? '<span>소리 ON</span>' : '<span class="bad">소리 없음 · 스윙을 나눌 수 없음</span>');
+  }
+  $('#sStat').innerHTML = tags.join('');
+
+  // 새로고침·다른 기기 등으로 어긋난 녹화 상태를 서버 기준으로 맞춘다
+  if (seq === S.ses.seq && !S.ses.busy){
+    const rec = r.recording;
+    if (rec && !S.ses.recording){
+      setSessionRecording(true, Date.now() - rec.elapsed_sec * 1000);
+      if (!S.ses.cur || S.ses.cur.session_id !== rec.session_id){ S.ses.cur = null; await refreshSession(rec.session_id); }
+    } else if (!rec && S.ses.recording) setSessionRecording(false);
+    if (rec && rec.limit_reached && !S.ses.limitWarned){
+      S.ses.limitWarned = true;
+      toast('최대 녹화 시간(' + Math.round(S.ses.maxSec / 60) + '분)에 도달했습니다. 정지를 누르면 저장됩니다', 4000);
+    }
+  }
+  updateSessionHint();
+}
+
+function startSessionTick(){
+  if (S.ses.tick) return;
+  const loop = async ()=>{
+    if (S.view !== 'session'){ S.ses.tick = null; return; }
+    try{
+      await syncSessionStatus();
+      const c = S.ses.cur;
+      if (c && (sessionBusy(c) || c.status === 'recording')) await refreshSession(c.session_id);
+    }catch(e){}
+    S.ses.tick = setTimeout(loop, 1500);
+  };
+  S.ses.tick = setTimeout(loop, 800);
+}
+
+/* 이 선수의 기록(홈)으로 가서 방금 세션 폴더를 펼칩니다 */
+$('#sGoRecords').onclick = async ()=>{
+  if (S.ses.recording){ toast('녹화를 먼저 중지하세요'); return; }
+  const p = playerById(S.ana.player);
+  if (!p) return;
+  S.home.team = p.team;
+  S.home.openFolders = new Set(S.ses.cur ? [S.ses.cur.session_id] : []);
+  renderHome();
+  go('home');
+  await selectHomePlayer(p.id);
+};
 $('#progOpen').onclick = ()=> openReport(S.job.pid, S.job.rid);
 </script>
 
@@ -2907,8 +3192,9 @@ $('#btnClearCache').onclick = async ()=>{
 #login{display:none!important}
 /* 읽기 전용 — 촬영·분석·편집·서버설정으로 가는 길을 전부 막습니다. */
 .navitem[data-go="manage"],.navitem[data-go="analysis"],.navitem[data-go="settings"],
+.navitem[data-go="collect"],.navitem[data-go="clips"],
 #btnLogout,#connBox,#hpAnalyze,#hpEdit,
-.fcard[data-f="manage"],.fcard[data-f="analysis"]{display:none!important}
+.fcard[data-f="manage"],.fcard[data-f="analysis"],.fcard[data-f="collect"]{display:none!important}
 /* 기록 목록 오른쪽의 머리고정 점수는 숨깁니다 — 리포트를 열면 그대로 보입니다. */
 .rrow .sc{display:none!important}
 #pubBar{
@@ -2923,11 +3209,6 @@ $('#btnClearCache').onclick = async ()=>{
   border-radius:8px;padding:3px 9px;font-size:12px;cursor:pointer;
 }
 #pubBar .lk:hover{background:var(--surface3)}
-
-/* 기록 목록 오른쪽의 머리고정 점수는 숨깁니다 — 리포트를 열면 그대로 보입니다.
-   공개본 전용 조정이라 arcmo_web.html 원본은 건드리지 않고 여기서만 가립니다.
-   (2026-09-10 에 index.html 을 직접 고쳤다가, 다시 뽑으면 사라져서 도구로 옮겼습니다) */
-.rrow .sc{display:none!important}
 </style>
 <script>
 'use strict';
