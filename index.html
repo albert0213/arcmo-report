@@ -379,10 +379,6 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 /* 시선 움직임 등급 */
 .gz-perfect{--gz:var(--ok)} .gz-good{--gz:var(--accent)} .gz-notbad{--gz:var(--warn)} .gz-bad{--gz:var(--danger)}
 .gz-perfect,.gz-good,.gz-notbad,.gz-bad{color:var(--gz)}
-.gzscale{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
-.gzscale>span{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--ink3);line-height:1.35}
-.gzscale>span b{display:block;font-size:13px;color:var(--gz)}
-.gzscale>span.on{border-color:var(--gz);background:color-mix(in srgb,var(--gz) 11%,transparent);color:var(--ink2)}
 .mcard .sub{font-size:12px;color:var(--ink3)}
 .chips{display:flex;gap:7px;flex-wrap:wrap}
 .chip{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:650;color:var(--ink2)}
@@ -3087,31 +3083,20 @@ function openDetail(which){
         refY:[0, -dwin], refInRange:true,
         bands:[{from:0, to:-dwin, color:cssv('--ok')}],
         series:[{name:'기준선 대비 머리 높이 (위 +)', color:S1, data:rel}]});
-      const m = GAZE[g.grade] || {};
-      const cuts = P.cuts || [];
-      const scale = Object.keys(GAZE).map((k,i)=>{
-        const lo = cuts[i], hi = i ? cuts[i-1] : 100;
-        const rng = i === 0 ? lo+'점 이상' : (lo!=null ? lo+'–'+hi+'점' : hi+'점 미만');
-        return '<span class="'+GAZE[k].cls+(k===g.grade?' on':'')+'"><b>'+GAZE[k].text+'</b>'+rng+'</span>';
-      }).join('');
+      /* 채점 방식(감점 규칙·점수·등급 컷)은 화면에 내지 않습니다 — 결과와 그래프만. */
+      const m = GAZE[g.grade];
       const fr = f => f==null ? '' : ' <span class="dim">(프레임 '+(f+1)+')</span>';
       body = '<div class="muted" style="font-size:13.5px">'
-           + '타격 준비 자세의 머리 높이를 <b style="color:var(--ink)">기준선(0%)</b>으로 두고, 임팩트 직후까지 머리가 '
-           + '얼마나 뜨고 가라앉는지를 <b style="color:var(--ink)">몸 크기(머리~발목) 대비 %</b>로 봅니다.<br>'
-           + '<b style="color:var(--danger)">기준선보다 위로 뜨면</b> 시선이 공에서 떨어진 것이라 크게 감점하고, '
-           + '<b style="color:var(--ok)">아래로 가라앉는 것</b>은 '+(P.down_window_pct||0)+'%까지 감점하지 않습니다 '
-           + '(그래프의 아래 점선).</div>'
+           + '타격 준비 자세의 머리 높이(0%)를 기준으로, 임팩트 직후까지 머리가 얼마나 뜨고 가라앉았는지 보여줍니다. '
+           + '위로 뜨면 +, 가라앉으면 −이고 초록 구간은 괜찮은 범위입니다.</div>'
            + '<div class="kv" style="margin-top:10px">'
+           + '<span class="muted">등급</span><span class="n '+(m?m.cls:'')+'">'+(m?m.text:'-')+'</span><span></span>'
            + '<span class="muted">위로 뜬 최대</span><span class="n">'+pct1(g.up_pct)+fr(g.up_frame)+'</span><span></span>'
            + '<span class="muted">아래로 간 최대</span><span class="n">'+pct1(g.down_pct)+fr(g.down_frame)+'</span><span></span>'
-           + '<span class="muted">점수</span><span class="n '+(m.cls||'')+'">'+(g.score==null?'-':g.score.toFixed(0))+' / 100</span><span></span>'
            + '</div>'
-           + '<div class="gzscale">'+scale+'</div>'
            + (g.basis === 'clip'
-               ? '<div class="dim" style="font-size:12px;margin-top:8px">타격음(임팩트)을 찾지 못한 영상이라 평가 구간을 정할 수 없어 '
-                 + '<b>등급을 매기지 않았습니다</b>. 위 수치는 클립 전체 기준이라 준비 동작·걸음이 섞여 있습니다.</div>'
-               : '<div class="dim" style="font-size:12px;margin-top:8px">평가 구간: 분석 구간 시작 ~ 임팩트 후 '
-                 + Math.round((P.post_sec||0)*1000)+'ms. 그 뒤 팔로스루에서 머리가 드는 것은 넣지 않습니다.</div>');
+               ? '<div class="dim" style="font-size:12px;margin-top:8px">타격음(임팩트)을 찾지 못한 영상이라 등급이 없습니다.</div>'
+               : '');
     } else {
       charts.push({id:'c1', x:n.frame||[],
         fmtY:v=>v.toFixed(0), fmtV:v=>v.toFixed(1)+'px',
