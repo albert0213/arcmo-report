@@ -48,6 +48,10 @@ button{cursor:pointer;border:0;background:none}
 h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:-.01em}
 a{color:var(--accent)}
 .hide{display:none !important}
+/* hidden 속성이 항상 먹게 합니다. 브라우저 기본값은 [hidden]{display:none} 이지만
+   .btn{display:inline-flex} 같은 우리 규칙에 밀려 무시됩니다(같은 명시도면 작성자 우선).
+   그래서 el.hidden=true 로 숨긴 요소가 그대로 보이는 일이 있었습니다. */
+[hidden]{display:none !important}
 .muted{color:var(--ink2)}
 .dim{color:var(--ink3)}
 .mono{font-variant-numeric:tabular-nums}
@@ -288,6 +292,32 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .ccount{font-size:13px;color:var(--ink2)}
 .ccount b{font-size:22px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
 
+/* ── 연속 스윙 촬영: 화면 우측 임팩트 목록 ─────────────
+   타격음으로 찾은 임팩트를 1,2,3… 으로 보여줍니다. 영상 위에 겹치므로
+   .cstat(150fps·소리ON) 아래에서 시작합니다. */
+.simpacts{position:absolute;top:50px;right:12px;width:142px;max-height:calc(100% - 64px);
+  display:none;flex-direction:column;gap:5px;overflow-y:auto;scrollbar-width:none}
+.simpacts::-webkit-scrollbar{display:none}
+.simpacts.on{display:flex}
+.simpacts .hd{background:rgba(0,0,0,.58);color:#fff;padding:5px 10px;border-radius:8px;
+  font-size:11.5px;font-weight:700;text-align:center;position:sticky;top:0}
+.simpacts .hd .rm{display:block;margin-top:2px;font-size:11px;font-weight:650;color:#b9c2cf}
+.simpacts .it{display:flex;align-items:center;gap:7px;width:100%;text-align:left;border:0;
+  background:rgba(0,0,0,.58);color:#fff;padding:5px 9px;border-radius:8px;font-size:12px;font-weight:700}
+.simpacts button.it:hover{background:rgba(0,0,0,.78)}
+.simpacts .it b{flex:none;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(255,255,255,.2);font-size:11px;font-weight:800}
+.simpacts .it .t{margin-left:auto;font-size:11px;font-weight:650;color:#c2cad6;font-variant-numeric:tabular-nums}
+.simpacts .it.ok b{background:var(--ok);color:#fff}
+.simpacts .it.run b{background:var(--accent);color:#fff}
+.simpacts .it.bad b{background:var(--danger);color:#fff}
+
+/* capbar 세 칸을 가로지르는 넓은 버튼. 분석이 끝나기 전에는 진행 상황을 말하는
+   표지판이라, 눌리지 않아도 글자는 또렷해야 합니다(기본 .btn:disabled 는 너무 흐림). */
+.capbar .sdone{grid-column:1/-1;width:100%}
+.capbar .sdone:disabled{opacity:1;cursor:default;background:var(--surface2);
+  border-color:var(--line);color:var(--ink2);font-weight:650}
+
 /* 수집 영상 목록 */
 .clipbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
 .clipbar select.inp{width:auto;min-height:38px;padding:6px 12px}
@@ -346,6 +376,13 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .mcard .t svg{width:14px;height:14px;margin-left:auto;color:var(--ink3)}
 .mcard .v{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-top:auto}
 .mcard .v small{font-size:15px;font-weight:600;color:var(--ink3)}
+/* 시선 움직임 등급 */
+.gz-perfect{--gz:var(--ok)} .gz-good{--gz:var(--accent)} .gz-notbad{--gz:var(--warn)} .gz-bad{--gz:var(--danger)}
+.gz-perfect,.gz-good,.gz-notbad,.gz-bad{color:var(--gz)}
+.gzscale{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.gzscale>span{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--ink3);line-height:1.35}
+.gzscale>span b{display:block;font-size:13px;color:var(--gz)}
+.gzscale>span.on{border-color:var(--gz);background:color-mix(in srgb,var(--gz) 11%,transparent);color:var(--ink2)}
 .mcard .sub{font-size:12px;color:var(--ink3)}
 .chips{display:flex;gap:7px;flex-wrap:wrap}
 .chip{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:650;color:var(--ink2)}
@@ -647,6 +684,7 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
         <div class="ph" id="sPreviewPh">카메라 연결을 확인하는 중…</div>
         <div class="recbadge" id="sRecBadge"><i></i> 녹화 중</div>
         <div class="cstat" id="sStat"></div>
+        <div class="simpacts" id="sImpacts"></div>
       </div>
       <div class="ctools">
         <span class="sstatus" id="sStatus"></span>
@@ -663,6 +701,9 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
           <span class="ccount">스윙 <b id="sCount">0</b>개</span>
           <span class="dim" style="font-size:12px;text-align:right" id="sHint">녹화를 시작하고 스윙을 이어서 하세요</span>
         </div>
+        <!-- 글자·색·활성 여부는 renderSessionDone() 이 상태에 맞춰 정합니다.
+             켜진 모습(primary)으로 시작하면 첫 진입에서 잠깐 파랗게 보입니다. -->
+        <button class="btn lg sdone" id="sBtnDone" hidden disabled></button>
       </div>
     </section>
 
@@ -1018,6 +1059,14 @@ function playerHeaderHTML(p){
     + '</div></div>';
 }
 
+/* 시선 움직임 등급 — summary.head_gaze.grade (metrics.HEAD_GAZE_GRADES) */
+const GAZE = {
+  'perfect': {text:'Perfect', cls:'gz-perfect'},
+  'good':    {text:'Good',    cls:'gz-good'},
+  'not bad': {text:'Not bad', cls:'gz-notbad'},
+  'bad':     {text:'Bad',     cls:'gz-bad'},
+};
+
 function renderReportList(){
   const host = $('#repList'); if (!host) return;
   const st = S.home;
@@ -1032,12 +1081,12 @@ function renderReportList(){
     const tags = (r.items||[]).map(t=>'<span class="pill">'+esc(t)+'</span>').join('');
     const stt = r.is_complete ? '<span class="pill ok">완료</span>'
               : (r.has_summary ? '<span class="pill run">중단됨</span>' : '<span class="pill bad">미완</span>');
-    const hs = r.head_stability!=null ? r.head_stability.toFixed(1) : '-';
+    const gz = GAZE[r.head_gaze_grade];
     const sub = child && r.session ? ('#'+r.session.index+' · '+r.report_id) : r.report_id;
     return '<button class="rrow'+(child?' child':'')+'" data-open="'+esc(r.report_id)+'">'
       + '<span class="d"><b>'+esc(r.date||'-')+'</b><span>'+esc(sub)+'</span></span>'
       + '<span class="tags grow">'+(tags||'<span class="dim">항목 없음</span>')+'</span>'
-      + '<span class="sc"><b>'+hs+'</b><span>머리고정</span></span>'
+      + '<span class="sc"><b'+(gz?' class="'+gz.cls+'"':'')+'>'+(gz?gz.text:'-')+'</b><span>시선 움직임</span></span>'
       + '<span class="d" style="min-width:auto">'+stt+'</span>'
       + '<svg class="i go" viewBox="0 0 24 24" style="width:17px"><path d="M9 5l7 7-7 7"/></svg>'
       + '</button>';
@@ -1253,13 +1302,15 @@ async function reloadPlayers(){
 
 <script>
 /* ═══════════ 분석: 선수 + 항목 선택 ═══════════ */
+/* 키(한글)는 서버 analyze.py 가 그대로 보는 이름이라 바꾸지 않습니다. 화면 이름은 label. */
 const OPT_META = {
   '손 이동경로':      {ov:'hand_trace',            desc:'스윙 궤적과 히팅포인트', lr:true},
-  '머리 고정':        {ov:'head_stability',        desc:'머리 흔들림 점수'},
+  '머리 고정':        {ov:'head_stability',        desc:'머리가 기준선 위로 뜨는지', label:'시선 움직임'},
   '어깨-골반 회전':   {ov:'shoulder_hip_rotation', desc:'상하체 분리·어깨 열림'},
   '무게중심':         {ov:'center_shift',          desc:'임팩트 시 앞뒤 체중'},
 };
 const OPT_ORDER = ['손 이동경로','머리 고정','어깨-골반 회전','무게중심'];
+const optLabel = k => (OPT_META[k] && OPT_META[k].label) || k;
 
 function startFlowFor(p){
   S.ana.team = p.team; S.ana.player = p.id;
@@ -1300,7 +1351,7 @@ function renderAnaRight(){
     const on = st.items.has(k) && !dis;
     return '<button class="opt'+(on?' on':'')+'" data-o="'+esc(k)+'"'+(dis?' disabled':'')+'>'
       + '<span class="box"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px;stroke-width:3"><path d="M5 12l5 5L19 7"/></svg></span>'
-      + '<span><span>'+esc(k)+'</span><small>'+esc(dis?'선수 타격 손(L/R) 정보가 필요합니다':m.desc)+'</small></span></button>';
+      + '<span><span>'+esc(optLabel(k))+'</span><small>'+esc(dis?'선수 타격 손(L/R) 정보가 필요합니다':m.desc)+'</small></span></button>';
   }).join('');
 
   host.innerHTML = playerHeaderHTML(p).replace('id="hpAnalyze">분석하기','id="hpAnalyze" style="display:none">분석하기')
@@ -1442,14 +1493,14 @@ $('#btnAnalyze').onclick = async ()=>{
 /* ═══════════ 진행 상황 ═══════════ */
 const STEP_LABEL = {
   preprocess:'영상 전처리', motion_capture:'동작 추출 (자세 인식)',
-  hand_trace:'손 이동경로', head_stability:'머리 고정',
+  hand_trace:'손 이동경로', head_stability:'시선 움직임',
   center_shift:'무게중심', shoulder_hip_rotation:'어깨-골반 회전',
 };
 
 function startJob(player, reportId, items){
   S.job = {pid:player.id, rid:reportId, polling:true, stop:false};
   $('#progTitle').textContent = player.name + ' 분석 중';
-  $('#progSub').textContent = reportId + ' · ' + items.join(', ');
+  $('#progSub').textContent = reportId + ' · ' + items.map(optLabel).join(', ');
   $('#progErr').textContent = '';
   $('#progOpen').disabled = true;
   const want = ['preprocess','motion_capture'].concat(items.map(k=>OPT_META[k].ov));
@@ -1518,10 +1569,18 @@ $('#progBack').onclick = ()=>{ S.job.stop = true; go('capture'); startPreview();
 S.ses = { recording:false, busy:false, seq:0, t0:0, timer:null, tick:null, limitWarned:false,
           cur:null, maxSec:300 };
 
-const SES_STATUS = { recording:'녹화 중', saving:'영상 저장 · 타격음 찾는 중', splitting:'스윙 자르는 중',
-                     analyzing:'스윙별 분석 중', done:'완료', failed:'실패', interrupted:'중단됨' };
+const SES_STATUS = { recording:'녹화 중', queued:'차례 기다리는 중', saving:'영상 저장 · 타격음 찾는 중',
+                     splitting:'스윙 자르는 중', analyzing:'스윙별 분석 중',
+                     done:'완료', failed:'실패', interrupted:'중단됨' };
 
-function sessionBusy(c){ return !!c && ['saving','splitting','analyzing'].includes(c.status); }
+function sessionBusy(c){ return !!c && ['queued','saving','splitting','analyzing'].includes(c.status); }
+
+/* 서버가 한 번에 한 세션만 처리합니다(GPU). 앞에 밀려 있으면 그대로 말해 줍니다.
+   queue_pos 는 대기열에서의 자리 = 내 앞에서 끝나야 하는 세션 수 (처리 중인 것 포함). */
+function sesStatusText(c){
+  if (c.status === 'queued' && c.queue_pos > 0) return '앞 세션 ' + c.queue_pos + '개 끝나기를 기다리는 중';
+  return SES_STATUS[c.status] || c.status;
+}
 
 function enterSession(){
   const p = playerById(S.ana.player);
@@ -1529,21 +1588,19 @@ function enterSession(){
   if (!S.ana.items.size){ toast('분석 항목을 하나 이상 고르세요'); return; }
   $('#sWho').textContent = p.name + ' · ' + Array.from(S.ana.items).join(', ');
   if (!S.ses.recording) $('#sTimer').textContent = '0:00';
-  if (S.ses.cur && S.ses.cur.player_id !== p.id) S.ses.cur = null;
+  // 들어올 때는 늘 빈 화면에서 시작합니다. 앞 촬영의 임팩트 목록이 남아 있으면
+  // 방금 찍은 것으로 오해합니다. 앞 세션의 리포트는 '기록 보기'에서 봅니다.
+  // (녹화 도중 새로고침한 경우는 syncSessionStatus 가 서버 기준으로 되살립니다)
+  if (!S.ses.recording) S.ses.cur = null;
   go('session');
   startSessionPreview();
   renderSessionPanel();
-  loadLatestSession(p.id).catch(()=>{});
   syncSessionStatus().catch(()=>{});
   startSessionTick();
 }
-
-async function loadLatestSession(pid){
-  if (S.ses.cur) return;
-  const r = await api('/api/sessions?limit=1&player_id=' + encodeURIComponent(pid), {timeout:8000});
-  const c = (r.sessions || [])[0];
-  if (c && !S.ses.cur && c.day === todayYmd()){ S.ses.cur = c; renderSessionPanel(); }
-}
+/* 지난 세션은 일부러 불러오지 않습니다. 처음 들어왔을 때 남의(앞 촬영의) 임팩트 목록이
+   보이면 방금 찍은 것으로 오해합니다. 이 화면을 떠났다 돌아온 경우에는 S.ses.cur 가
+   메모리에 남아 있어 진행 중이던 세션이 그대로 이어져 보입니다. */
 
 function startSessionPreview(){
   const img = $('#sPreview'), ph = $('#sPreviewPh');
@@ -1568,6 +1625,7 @@ function setSessionRecording(on, t0){
     $('#sTimer').textContent = fmtDur(Date.now() - S.ses.t0);
     S.ses.timer = setInterval(()=>{ $('#sTimer').textContent = fmtDur(Date.now() - S.ses.t0); }, 200);
   }
+  renderSessionDone(S.ses.cur);
   updateSessionHint();
 }
 
@@ -1606,7 +1664,12 @@ async function toggleSessionRec(){
     updateSessionHint();
   }
 }
+/* 녹화 켜고 끄기는 빨간 원(과 스페이스바) 하나로만 합니다. */
 $('#sBtnRec').onclick = e => { e.currentTarget.blur(); toggleSessionRec(); };
+
+/* 아래 넓은 버튼은 진행 상황판이자 리포트로 가는 문입니다.
+   분석이 끝나기 전에는 눌리지 않고 지금 무슨 단계인지만 알려 줍니다. */
+$('#sBtnDone').onclick = e => { e.currentTarget.blur(); goSessionRecords(); };
 
 document.addEventListener('keydown', e => {
   if (S.view !== 'session' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1619,10 +1682,82 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* 남은 분석 시간 — 서버가 최근 스윙들이 실제로 걸린 시간에서 어림잡아 줍니다.
+   분 단위로 올려서 말합니다. 초 단위로 흔들리면 오히려 불안하게 보입니다. */
+function fmtRemain(sec){
+  if (sec == null || sec <= 0) return '';
+  if (sec < 60) return '약 ' + Math.max(10, Math.round(sec / 10) * 10) + '초 남음';
+  return '약 ' + Math.max(1, Math.round(sec / 60)) + '분 남음';
+}
+
+/* 화면 우측: 타격음으로 찾은 임팩트 1,2,3…
+   시각은 테이크 기준(take_impact_frame / fps)이라 "몇 초쯤의 스윙인지" 바로 보입니다. */
+function renderSessionImpacts(c){
+  const box = $('#sImpacts');
+  const sw = (c && c.swings) || [];
+  if (!sw.length){ box.classList.remove('on'); box.innerHTML = ''; return; }
+  const fps = (c.take && c.take.fps) || 0;
+  const rows = sw.map(s => {
+    const cls = s.status === 'done' ? 'ok' : s.status === 'running' ? 'run'
+              : (s.status === 'failed' || s.status === 'interrupted') ? 'bad' : '';
+    const at = fps ? (s.take_impact_frame / fps).toFixed(1) + '초' : '';
+    const tag = { done:'리포트 ›', running:'분석 중', cutting:'자르는 중',
+                  queued:'대기', failed:'실패', interrupted:'중단' }[s.status] || s.status;
+    const inner = '<b>' + s.index + '</b><span>' + esc(tag) + '</span><span class="t">' + at + '</span>';
+    return (s.report_id
+      ? '<button class="it ' + cls + '" data-rep="' + esc(s.report_id) + '">' + inner + '</button>'
+      : '<div class="it ' + cls + '" title="' + esc(s.error || '') + '">' + inner + '</div>');
+  });
+  // 신뢰도가 낮아 스윙에서 빠진 소리가 있으면 그 수도 알려 줍니다.
+  const found = (c.take && c.take.detected_impacts) || sw.length;
+  const head = '임팩트 ' + sw.length + '개' + (found > sw.length ? ' (' + (found - sw.length) + '개 제외)' : '');
+  const remain = fmtRemain(c.remaining_sec);
+  box.innerHTML = '<div class="hd">' + head
+    + (remain ? '<span class="rm">' + remain + '</span>' : '') + '</div>' + rows.join('');
+  box.classList.add('on');
+  $$('#sImpacts [data-rep]').forEach(b => b.onclick = ()=>{
+    if (S.ses.recording){ toast('녹화를 먼저 중지하세요'); return; }
+    S.repBack = 'session';
+    openReport(c.player_id, b.dataset.rep);
+  });
+}
+
+/* 아래 넓은 버튼. 분석이 끝나기 전에는 진행 상황을 말하는 표지판이고,
+   끝나면 리포트로 가는 버튼이 됩니다. 녹화 제어는 하지 않습니다. */
+function renderSessionDone(c){
+  const btn = $('#sBtnDone');
+  const sw = (c && c.swings) || [];
+  const ready = sw.filter(s => s.status === 'done' && s.report_id).length;
+  const remain = fmtRemain(c && c.remaining_sec);
+
+  if (!c || (S.ses.recording && !sw.length)){       // 아직 찍은 게 없다
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+
+  let label, can = false;
+  if (S.ses.recording)                 label = '녹화 중 · 멈추면 분석을 시작합니다';
+  else if (c.status === 'queued')      label = '분석 대기 중' + (c.queue_pos > 0 ? ' · 앞 세션 ' + c.queue_pos + '개' : '');
+  else if (c.status === 'saving')      label = '영상 저장 · 타격음 찾는 중…';
+  else if (c.status === 'splitting')   label = '스윙 자르는 중… · ' + sw.length + '개';
+  else if (c.status === 'analyzing')   label = '분석 중… ' + sw.filter(s=>s.status==='done').length + '/' + sw.length
+                                             + (remain ? ' · ' + remain : '');
+  else if (ready)                      label = '리포트 보기 · ' + ready + '개', can = true;
+  else if (c.status === 'done')        label = '타격음을 찾지 못했습니다';
+  else                                 label = SES_STATUS[c.status] || c.status;
+
+  btn.textContent = label;
+  btn.disabled = !can;
+  btn.classList.toggle('primary', can);
+}
+
 function renderSessionPanel(){
   const c = S.ses.cur;
   const sw = (c && c.swings) || [];
   $('#sCount').textContent = sw.length;
+  renderSessionImpacts(c);
+  renderSessionDone(c);
   if (!c){
     $('#sStatus').textContent = '녹화를 멈추면 타격음마다 스윙을 잘라 각각 분석합니다.';
     $('#sStrip').innerHTML = '';
@@ -1630,9 +1765,10 @@ function renderSessionPanel(){
     return;
   }
   const done = sw.filter(s => s.status === 'done').length;
-  const parts = [clipTime(c.session_id) + ' 촬영', SES_STATUS[c.status] || c.status];
+  const parts = [clipTime(c.session_id) + ' 촬영', sesStatusText(c)];
   if (c.take && c.status !== 'recording') parts.push(Number(c.take.duration_sec || 0).toFixed(1) + '초');
   if (sw.length && ['analyzing','done'].includes(c.status)) parts.push('분석 ' + done + '/' + sw.length);
+  if (c.status === 'analyzing' && fmtRemain(c.remaining_sec)) parts.push(fmtRemain(c.remaining_sec));
   if (c.warning) parts.push(c.warning);
   if (c.error) parts.push(c.error);
   $('#sStatus').textContent = parts.join(' · ');
@@ -1708,7 +1844,7 @@ function startSessionTick(){
 }
 
 /* 이 선수의 기록(홈)으로 가서 방금 세션 폴더를 펼칩니다 */
-$('#sGoRecords').onclick = async ()=>{
+async function goSessionRecords(){
   if (S.ses.recording){ toast('녹화를 먼저 중지하세요'); return; }
   const p = playerById(S.ana.player);
   if (!p) return;
@@ -1717,7 +1853,8 @@ $('#sGoRecords').onclick = async ()=>{
   renderHome();
   go('home');
   await selectHomePlayer(p.id);
-};
+}
+$('#sGoRecords').onclick = ()=> goSessionRecords();
 $('#progOpen').onclick = ()=> openReport(S.job.pid, S.job.rid);
 </script>
 
@@ -2116,7 +2253,7 @@ function analyzeClipsSheet(ids){
   const drawOpts = ()=>{
     $('#caOpts').innerHTML = OPT_ORDER.map(k => '<button class="opt'+(items.has(k)?' on':'')+'" data-o="'+esc(k)+'">'
       + '<span class="box"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px;stroke-width:3"><path d="M5 12l5 5L19 7"/></svg></span>'
-      + '<span><span>'+esc(k)+'</span><small>'+esc(OPT_META[k].desc)+'</small></span></button>').join('');
+      + '<span><span>'+esc(optLabel(k))+'</span><small>'+esc(OPT_META[k].desc)+'</small></span></button>').join('');
     $$('#caOpts .opt').forEach(b => b.onclick = ()=>{
       const k = b.dataset.o;
       if (items.has(k)) items.delete(k); else items.add(k);
@@ -2184,6 +2321,8 @@ function drawChart(host, spec){
   let lo = Infinity, hi = -Infinity;
   sets.forEach(s => s.data.forEach(v => { if (v!=null && Number.isFinite(v)){ if(v<lo)lo=v; if(v>hi)hi=v; } }));
   if (!Number.isFinite(lo)){ lo=0; hi=1; }
+  // 기준선이 늘 보여야 하는 차트(시선 움직임의 허용선 등)는 범위를 넓혀서라도 넣습니다
+  if (spec.refInRange) (spec.refY||[]).forEach(v => { if (v<lo) lo=v; if (v>hi) hi=v; });
   if (lo === hi){ lo -= 1; hi += 1; }
   const pad = (hi-lo)*0.14; lo -= pad; hi += pad;
   if (spec.zeroFloor && lo > 0) lo = 0;
@@ -2207,6 +2346,13 @@ function drawChart(host, spec){
     const v = x0 + (x1-x0)*i/3;
     g.fillText(String(Math.round(v)), px(v), H-padB+7);
   }
+
+  // 띠 (예: 허용 구간) — {from, to, color}
+  (spec.bands||[]).forEach(b => {
+    const y0 = py(Math.min(hi, Math.max(b.from, b.to))), y1 = py(Math.max(lo, Math.min(b.from, b.to)));
+    g.save(); g.globalAlpha = 0.10; g.fillStyle = b.color;
+    g.fillRect(padL, y0, W-padL-padR, y1-y0); g.restore();
+  });
 
   // 기준선 (예: 0°, 90°) — 값 범위 안에 들어올 때만 점선으로
   (spec.refY||[]).forEach(v => {
@@ -2318,7 +2464,7 @@ function chartHTML(id){
 
 <script>
 /* ═══════════ 리포트 ═══════════ */
-const OV_LABEL = { skeleton:'스켈레톤', hand_trace:'손 이동경로', head_stability:'머리 고정',
+const OV_LABEL = { skeleton:'스켈레톤', hand_trace:'손 이동경로', head_stability:'시선 움직임',
                    center_shift:'무게중심', shoulder_hip_rotation:'어깨-골반 회전' };
 
 async function openReport(pid, rid){
@@ -2354,7 +2500,7 @@ async function openReport(pid, rid){
 function renderReport(){
   const R = S.rep, sm = R.summary || {};
   const p = R.player || {name:R.pid, team:'', number:'', position:'', lr:''};
-  const hs = num(sm.head_stability), ws = num(sm.weight_shift_range);
+  const ws = num(sm.weight_shift_range);
   const sep = num(sm.separation_deg), stride = num(sm.stride_cm);
   const rows = [
     ['테이크백', num(sm.shoulder_takeback_deg), num(sm.pelvis_takeback_deg)],
@@ -2402,9 +2548,7 @@ function renderReport(){
       + '</div>'
     + '</div>'
     + '<div class="mcards">'
-      + card('head','머리 고정',
-             '<span class="v">'+(hs==null?'-':hs.toFixed(1))+'<small> / 10</small></span>',
-             headNote(sm), hasSeries('head_stability'))
+      + card('head','시선 움직임', gazeValHTML(sm), gazeNote(sm), hasSeries('head_stability'))
       + card('cs','체중이동',
              '<span class="v">'+(ws==null?'-':ws.toFixed(1))+'</span>',
              '뒷발 → 앞발 최대 이동폭', hasSeries('center_shift'))
@@ -2441,11 +2585,22 @@ function impactNoteHTML(){
   return '<div style="margin-top:6px;color:var(--accent);font-weight:600">'
     + '⚡ 소리로 찾은 임팩트: 프레임 ' + (f+1) + conf + '</div>' + windowNoteHTML();
 }
-function headNote(sm){
-  const t = sm.head_score_thresholds;
-  /* 옛 픽셀 척도(값이 1 이상)만 px 로 표시합니다. 현재 척도는 몸 크기 비율이라 px 가 아닙니다. */
-  if (Array.isArray(t) && t.length===2 && Math.max(t[0], t[1]) >= 1) return '척도 ' + t[0] + '–' + t[1] + 'px';
-  return '';
+/* 시선 움직임 — summary.head_gaze (metrics.compute_head_gaze). 없으면(재채점 전 리포트) '-'.
+   임팩트를 못 찾은 리포트(basis='clip')는 이동량만 있고 등급(grade)이 없습니다. */
+function gazeOf(sm){
+  const g = sm && sm.head_gaze;
+  return (g && g.up_pct != null) ? g : null;
+}
+function gazeValHTML(sm){
+  const g = gazeOf(sm), m = g && GAZE[g.grade];
+  return '<span class="v'+(m?' '+m.cls:'')+'">'+(m?m.text:'-')+'</span>';
+}
+const pct1 = v => (v==null ? '-' : v.toFixed(1)+'%');
+function gazeNote(sm){
+  const g = gazeOf(sm);
+  if (!g) return (sm && sm.head_gaze) ? '머리 좌표 부족 · 측정 불가' : '재채점 전 리포트';
+  if (!g.grade) return '임팩트 미검출 · 등급 없음';
+  return '위로 ' + pct1(g.up_pct) + ' · 아래로 ' + pct1(g.down_pct);
 }
 function hasSeries(key){
   const se = S.rep.series;
@@ -2660,6 +2815,19 @@ const OVL_DRAW = {
     if (anchor){
       ctx.strokeStyle = '#ff0000'; ctx.lineWidth = 2*g.s;
       ctx.beginPath(); ctx.arc(_X(g,anchor),_Y(g,anchor),30*g.s,0,TAU); ctx.stroke();
+    }
+    /* 시선 움직임 기준선(빨강) · 아래 허용선(초록 점선) — summary.head_gaze 가 있을 때만 */
+    const gz = gazeOf(S.rep && S.rep.summary);
+    if (anchor && gz && gz.baseline_y_px != null){
+      const hx = 90;
+      const hline = (y, color, dash) => {
+        ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2*g.s; if (dash) ctx.setLineDash([6*g.s, 5*g.s]);
+        ctx.beginPath(); ctx.moveTo(_X(g,[anchor[0]-hx,y]), _Y(g,[0,y])); ctx.lineTo(_X(g,[anchor[0]+hx,y]), _Y(g,[0,y]));
+        ctx.stroke(); ctx.restore();
+      };
+      hline(gz.baseline_y_px, '#ff3b30', false);
+      const dw = gz.params && gz.params.down_window_pct;
+      if (dw && gz.body_px) hline(gz.baseline_y_px + gz.body_px*dw/100, '#34c759', true);
     }
   },
 
@@ -2902,14 +3070,57 @@ function openDetail(which){
   }
   else if (which === 'head'){
     const n = (se && se.series && se.series.head_stability) || {};
-    charts.push({id:'c1', x:n.frame||[],
-      fmtY:v=>v.toFixed(0), fmtV:v=>v.toFixed(1)+'px',
-      series:[{name:'머리 상하(y)', color:S1, data:n.y_px||[]}, {name:'머리 좌우(x)', color:S2, data:n.x_px||[]}]});
-    title = '머리 고정';
-    const std = num(sm.head_score_std_px);
-    body = '<div class="muted" style="font-size:13.5px">머리 위치의 픽셀 좌표입니다. 선이 평평할수록 머리가 고정된 것입니다.'
-         + (std!=null ? ' 상하 흔들림 표준편차 <b style="color:var(--ink)">'+std.toFixed(2)+'px</b>.' : '') + '</div>'
-         + (repWindow() ? windowNoteHTML().replace('계산했습니다', '점수·머리 자취를 냈습니다') : '');
+    const g = gazeOf(sm);
+    title = '시선 움직임';
+    if (g && g.baseline_y_px != null && g.body_px){
+      /* 기준선 대비 머리 높이 — 몸 크기(머리~발목) %. 위로 뜨면 +, 가라앉으면 −.
+         분석 구간이 있으면 그 구간만 그립니다 (x 는 1-based, 구간은 0-based). */
+      const x0 = n.frame || [], w = repWindow();
+      const keep = x0.map((f,i)=>i).filter(i => !w || (x0[i]-1 >= w.s && x0[i]-1 <= w.e));
+      const rel = keep.map(i => { const y = (n.y_px||[])[i];
+        return (y==null) ? null : (g.baseline_y_px - y) / g.body_px * 100; });
+      const P = g.params || {};
+      const dwin = P.down_window_pct||0;
+      const sgn = v => { const s = Math.abs(v) < 0.05 ? '0.0' : v.toFixed(1); return (v >= 0.05 ? '+' : '') + s + '%'; };
+      charts.push({id:'c1', x:keep.map(i => x0[i]),
+        fmtY:sgn, fmtV:sgn,
+        refY:[0, -dwin], refInRange:true,
+        bands:[{from:0, to:-dwin, color:cssv('--ok')}],
+        series:[{name:'기준선 대비 머리 높이 (위 +)', color:S1, data:rel}]});
+      const m = GAZE[g.grade] || {};
+      const cuts = P.cuts || [];
+      const scale = Object.keys(GAZE).map((k,i)=>{
+        const lo = cuts[i], hi = i ? cuts[i-1] : 100;
+        const rng = i === 0 ? lo+'점 이상' : (lo!=null ? lo+'–'+hi+'점' : hi+'점 미만');
+        return '<span class="'+GAZE[k].cls+(k===g.grade?' on':'')+'"><b>'+GAZE[k].text+'</b>'+rng+'</span>';
+      }).join('');
+      const fr = f => f==null ? '' : ' <span class="dim">(프레임 '+(f+1)+')</span>';
+      body = '<div class="muted" style="font-size:13.5px">'
+           + '타격 준비 자세의 머리 높이를 <b style="color:var(--ink)">기준선(0%)</b>으로 두고, 임팩트 직후까지 머리가 '
+           + '얼마나 뜨고 가라앉는지를 <b style="color:var(--ink)">몸 크기(머리~발목) 대비 %</b>로 봅니다.<br>'
+           + '<b style="color:var(--danger)">기준선보다 위로 뜨면</b> 시선이 공에서 떨어진 것이라 크게 감점하고, '
+           + '<b style="color:var(--ok)">아래로 가라앉는 것</b>은 '+(P.down_window_pct||0)+'%까지 감점하지 않습니다 '
+           + '(그래프의 아래 점선).</div>'
+           + '<div class="kv" style="margin-top:10px">'
+           + '<span class="muted">위로 뜬 최대</span><span class="n">'+pct1(g.up_pct)+fr(g.up_frame)+'</span><span></span>'
+           + '<span class="muted">아래로 간 최대</span><span class="n">'+pct1(g.down_pct)+fr(g.down_frame)+'</span><span></span>'
+           + '<span class="muted">점수</span><span class="n '+(m.cls||'')+'">'+(g.score==null?'-':g.score.toFixed(0))+' / 100</span><span></span>'
+           + '</div>'
+           + '<div class="gzscale">'+scale+'</div>'
+           + (g.basis === 'clip'
+               ? '<div class="dim" style="font-size:12px;margin-top:8px">타격음(임팩트)을 찾지 못한 영상이라 평가 구간을 정할 수 없어 '
+                 + '<b>등급을 매기지 않았습니다</b>. 위 수치는 클립 전체 기준이라 준비 동작·걸음이 섞여 있습니다.</div>'
+               : '<div class="dim" style="font-size:12px;margin-top:8px">평가 구간: 분석 구간 시작 ~ 임팩트 후 '
+                 + Math.round((P.post_sec||0)*1000)+'ms. 그 뒤 팔로스루에서 머리가 드는 것은 넣지 않습니다.</div>');
+    } else {
+      charts.push({id:'c1', x:n.frame||[],
+        fmtY:v=>v.toFixed(0), fmtV:v=>v.toFixed(1)+'px',
+        series:[{name:'머리 상하(y)', color:S1, data:n.y_px||[]}, {name:'머리 좌우(x)', color:S2, data:n.x_px||[]}]});
+      body = '<div class="muted" style="font-size:13.5px">'
+           + (sm.head_gaze ? '분석 구간에서 머리가 잡힌 프레임이 부족해 시선 움직임을 잴 수 없었습니다. '
+                           : '이 리포트는 아직 시선 움직임으로 재채점되지 않았습니다. ')
+           + '머리 위치의 픽셀 좌표만 보여줍니다.</div>';
+    }
   }
   else if (which === 'hand'){
     title = '스윙 궤적 & 히팅포인트';
@@ -3198,7 +3409,7 @@ $('#btnClearCache').onclick = async ()=>{
 .navitem[data-go="collect"],.navitem[data-go="clips"],
 #btnLogout,#connBox,#hpAnalyze,#hpEdit,
 .fcard[data-f="manage"],.fcard[data-f="analysis"],.fcard[data-f="collect"]{display:none!important}
-/* 기록 목록 오른쪽의 머리고정 점수는 숨깁니다 — 리포트를 열면 그대로 보입니다. */
+/* 기록 목록 오른쪽의 시선 움직임 등급은 숨깁니다 — 리포트를 열면 그대로 보입니다. */
 .rrow .sc{display:none!important}
 #pubBar{
   position:sticky;top:0;z-index:40;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
