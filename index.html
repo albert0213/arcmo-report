@@ -365,6 +365,10 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .rgrid{display:grid;gap:14px;padding:16px;grid-template-columns:1fr}
 @media (min-width:980px){.rgrid{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);align-items:start}}
 .mcards{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+/* 리포트 화면 요약 카드 — 코치 메모 아래에 한 줄 2개 */
+.mcards.compact{gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.mcards.compact .mcard{min-height:100px;padding:14px 16px}
+.mcards.compact .mcard .v{font-size:28px}
 .mcard{
   display:flex;flex-direction:column;gap:4px;padding:15px;background:var(--surface);
   border:1px solid var(--line);border-radius:var(--r);text-align:left;box-shadow:var(--shadow);min-height:104px
@@ -384,7 +388,12 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .chip{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:650;color:var(--ink2)}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip[disabled]{opacity:.38}
-.vidbox{background:#000;border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:16/9}
+.vidbox{background:#000;border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:16/9;
+  /* 화면이 낮으면(태블릿 가로) 영상이 프레임 이동바를 밀어내지 않도록 높이를 묶습니다.
+     aspect-ratio 때문에 높이 상한이 너비로도 옮겨가 16:9 그대로 작아지고, 가운데에 놓입니다.
+     --topx 는 공개 리포트의 상단 안내줄 높이입니다(없으면 0). */
+  max-height:calc(100dvh - var(--appbar) - var(--topx,0px) - env(safe-area-inset-top) - 210px);min-height:180px;
+  margin-left:auto;margin-right:auto}
 .vidbox video{width:100%;height:100%;display:block;object-fit:contain;background:#000}
 .vidbox .ovl{position:absolute;inset:0;display:grid;place-items:center;color:#9aa2b1;text-align:center;padding:20px;font-size:13.5px;background:#000}
 .vidbox canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
@@ -396,12 +405,99 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
   .fstep .fnum{min-width:0;font-size:12.5px}
   .fstep .fnum small{display:none}      /* 좁은 화면에서는 초 표시를 접습니다 */
 }
+.fstep .fsbtn{margin-left:6px}
+/* 재생 속도 — 영상을 새로 만들지 않고 브라우저가 느리게 재생합니다(겹쳐보기 그대로) */
+.frate{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.frate .lbl{font-size:12px;font-weight:700;color:var(--ink3);margin-right:2px}
+.frate .btn{min-width:52px;font-variant-numeric:tabular-nums}
+.frate .btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .fslide{margin-top:10px;padding:0 2px;position:relative}
 .fslide input[type=range]{width:100%;height:26px;accent-color:var(--accent);cursor:pointer}
 /* 소리로 찾은 임팩트 — 슬라이더 위 세로 마커 */
 .fslide .fimp{position:absolute;top:3px;bottom:3px;width:2px;border-radius:2px;
   background:var(--accent);opacity:.8;transform:translateX(-1px);pointer-events:none}
 .btn.sm.imp{border-color:var(--accent);color:var(--accent);font-weight:700}
+
+/* ── 리포트 화면 가로 고정 ──
+   잠글 수 있는 브라우저(안드로이드 전체화면·설치 앱)는 syncOrientationLock 이 가로로 잠그고,
+   못 잠그는 곳(iPad Safari 는 잠금 API 가 없음)은 태블릿 세로일 때 이 안내를 덮습니다.
+   폰(짧은 변 600px 미만)은 세로 화면 그대로 둡니다. */
+.rotateHint{display:none;position:fixed;left:0;right:0;bottom:0;top:calc(var(--appbar) + env(safe-area-inset-top));
+  z-index:20;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:24px;text-align:center;color:var(--ink2)}
+@media (orientation:portrait) and (min-width:600px){ #app[data-view="report"] .rotateHint{display:flex} }
+
+/* ── 지표 상세: 영상과 프레임 이동바를 한 화면에 ──
+   넓은 화면(태블릿 가로)에서는 영상 카드를 왼쪽에 붙여 두고(sticky) 제목·설명·그래프를
+   오른쪽에서 넘깁니다. 좁은 화면에서는 제목 → 영상 → 설명·그래프 순으로 한 줄. */
+.dgrid{display:grid;gap:14px;grid-template-columns:minmax(0,1fr);
+  grid-template-areas:"head" "vid" "bar" "desc" "info"}
+.dgrid>.dhead{grid-area:head;min-width:0;margin-bottom:-14px}
+.dgrid>.ddesc{grid-area:desc;min-width:0}
+.dgrid>.dbar{grid-area:bar;min-width:0}
+.dgrid>.dbar>.card{margin-top:0 !important}
+.dgrid>.ddesc:empty,.dgrid>.dbar:empty,.dgrid>.dinfo:empty{display:none}
+.dgrid>.dvid{grid-area:vid;min-width:0}
+.dgrid>.dinfo{grid-area:info;min-width:0}
+.dgrid>.dvid>.card{margin-top:0 !important}
+.dinfo>.card:first-child,.dinfo>.chartgrid:first-child{margin-top:0 !important}
+#v-detail .vidbox{max-height:calc(100dvh - var(--appbar) - var(--topx,0px) - env(safe-area-inset-top) - 250px)}
+@media (min-width:980px){
+  .dgrid{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);grid-template-areas:"vid head" "vid desc" "vid bar" "vid info";
+    grid-template-rows:auto auto auto 1fr;align-items:start}
+  .dgrid>.dvid{position:sticky;top:0;align-self:start}
+  .dinfo .chartgrid{grid-template-columns:minmax(0,1fr)}
+  #v-detail .vidbox{max-height:calc(100dvh - var(--appbar) - var(--topx,0px) - env(safe-area-inset-top) - 200px)}
+}
+
+/* ── 전체화면 (겹쳐보기 그대로) ──
+   브라우저 기본 전체화면은 <video> 만 키워서 canvas 그래픽이 사라집니다.
+   그래서 영상·그래픽·조작부를 담은 별도 화면을 띄웁니다. */
+#fsView{position:fixed;inset:0;z-index:80;background:#000;color:#e8ecf2;display:none;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  user-select:none;-webkit-user-select:none}
+#fsView.on{display:flex}
+body.fsopen{overflow:hidden}
+.fsbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(18,21,26,.94)}
+.fsbar .chips{flex:1;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.fsbar .chips::-webkit-scrollbar{display:none}
+#fsView .chip{flex:none;background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);color:#d7dde6}
+#fsView .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+#fsView .btn{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);color:#e8ecf2}
+#fsView .btn.imp{border-color:#5b8ef0;color:#8fb3ff}
+#fsView .btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+#fsView .frate .lbl{color:#8d95a3}
+#fsView .fnum{color:#c9d0db;min-width:92px}
+#fsView .fnum small{color:#8d95a3}
+.fsstage{position:relative;flex:1;min-height:0;overflow:hidden;background:#000}
+.fsstage video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.fsstage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+.fsstage .ovl{position:absolute;inset:0;display:grid;place-items:center;color:#9aa2b1;text-align:center;padding:20px;font-size:13.5px;background:#000}
+.fsbot{flex:none;padding:6px 12px 10px;background:rgba(18,21,26,.94)}
+.fsbot .fslide{margin-top:0}
+.fsbot .fstep{margin-top:4px}
+.fsbot .fsplay{min-width:56px;font-size:16px}
+@media (max-width:560px){ .frate .lbl{display:none} .frate .btn{min-width:0} }
+
+/* 코치 메모 */
+.memoBar{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0 8px}
+.memoEd{min-height:96px;max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:12px;
+  padding:10px 12px;font-size:14px;line-height:1.6;outline:none;background:var(--surface2)}
+.memoEd:empty:before{content:attr(data-ph);color:var(--ink3)}
+.memoEd:focus{border-color:var(--accent,#3b82f6)}
+.memoEd h3{font-size:16px;margin:10px 0 4px}
+.memoEd blockquote{border-left:3px solid var(--line);margin:6px 0;padding-left:10px;color:var(--ink2)}
+.memoEd ul,.memoEd ol{padding-left:20px;margin:4px 0}
+.cmt{border:1px solid var(--line2);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--surface2)}
+.cmtHead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3);margin-bottom:6px}
+.cmtHead b{color:var(--ink);font-size:12.5px}
+.cmtHead .acts{margin-left:auto;display:flex;gap:6px}
+.cmtBody{font-size:14px;line-height:1.65;word-break:break-word}
+.cmtBody h3{font-size:16px;margin:8px 0 4px}
+.cmtBody blockquote{border-left:3px solid var(--line);margin:6px 0;padding-left:10px;color:var(--ink2)}
+.cmtBody ul,.cmtBody ol{padding-left:20px;margin:4px 0}
+#cmtList .cmt{margin-bottom:0}
+#cmtList .cmtBody{max-height:220px;overflow:auto}
 
 /* 무게중심 — 좌우 비율 막대 */
 .wbar-track{position:relative;height:34px;margin-top:4px}
@@ -452,7 +548,7 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .toast{
   position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,14px);
   background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;
-  box-shadow:var(--shadow2);opacity:0;pointer-events:none;transition:.2s;z-index:70;max-width:88vw;text-align:center
+  box-shadow:var(--shadow2);opacity:0;pointer-events:none;transition:.2s;z-index:90;max-width:88vw;text-align:center
 }
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
@@ -724,7 +820,13 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
     </section>
 
     <!-- ── 리포트 ── -->
-    <section class="view" id="v-report"><div id="reportRoot"></div></section>
+    <section class="view" id="v-report"><div id="reportRoot"></div>
+      <div class="rotateHint">
+        <svg class="i" viewBox="0 0 24 24" style="width:44px;height:44px;stroke-width:1.5"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M3 15a9 9 0 0 0 6 6M21 9a9 9 0 0 0-6-6"/></svg>
+        <b style="font-size:17px;color:var(--ink)">태블릿을 가로로 돌려주세요</b>
+        <span style="font-size:13.5px">리포트 화면은 가로 모드에서 봅니다.</span>
+      </div>
+    </section>
 
     <!-- ── 지표 상세 ── -->
     <section class="view" id="v-detail"><div id="detailRoot"></div></section>
@@ -773,6 +875,8 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 <!-- 공통 시트/토스트 -->
 <div class="sheet" id="sheet"><div class="bg" data-close></div><div class="panel" id="sheetPanel"></div></div>
 <div class="toast" id="toast"></div>
+<!-- 영상 전체화면 — openFs() 가 채웁니다 -->
+<div id="fsView" role="dialog" aria-label="영상 전체화면"></div>
 
 <script>
 'use strict';
@@ -904,6 +1008,8 @@ function go(view, silent){
   if (S.view === 'session' && view !== 'session') stopSessionPreview();
   if (view !== S.view) stopAllPlayers();
   S.view = view;
+  $('#app').dataset.view = view;
+  syncOrientationLock(view);
   $$('.view').forEach(v=>v.classList.toggle('on', v.id === 'v-'+view));
   $$('.navitem[data-go]').forEach(b=>b.classList.toggle('on', b.dataset.go===view));
   $('#barTitle').textContent = TITLES[view] || 'Arcmo';
@@ -948,9 +1054,40 @@ $('#btnBack').onclick = ()=>{
 };
 window.addEventListener('resize', updateBack);
 
+/* 리포트 화면은 태블릿에서 가로 고정 (CSS .rotateHint 와 짝). 잠금은 전체화면·설치 앱에서만
+   허락되므로 실패는 조용히 넘깁니다. */
+function syncOrientationLock(view){
+  const o = screen.orientation;
+  if (!o || !o.lock) return;
+  const tablet = Math.min(screen.width, screen.height) >= 600;
+  if (view === 'report' && tablet) o.lock('landscape').catch(()=>{});
+  else { try{ o.unlock(); }catch(e){} }
+}
+['fullscreenchange','webkitfullscreenchange'].forEach(t => document.addEventListener(t, ()=> syncOrientationLock(S.view)));
+
 function confirmLeaveCapture(){
   if (S.cap.recording) { toast('녹화를 먼저 중지하세요'); return false; }
   return true;
+}
+
+/* ═══════════ 브라우저 전체화면 API (영상 전체화면이 씁니다) ═══════════
+   iPhone Safari 처럼 요소 전체화면을 못 하는 브라우저에서는 enterBrowserFs 가 false 를 돌려주고,
+   영상 전체화면은 화면을 덮는 것으로만 동작합니다. */
+function fsElement(){ return document.fullscreenElement || document.webkitFullscreenElement || null; }
+function enterBrowserFs(el){
+  try{
+    const f = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!f) return false;
+    const r = f.call(el, {navigationUI:'hide'});
+    if (r && r.catch) r.catch(()=>{});
+    return true;
+  }catch(e){ return false; }
+}
+function exitBrowserFs(){
+  try{
+    const f = document.exitFullscreen || document.webkitExitFullscreen;
+    if (f && fsElement()){ const r = f.call(document); if (r && r.catch) r.catch(()=>{}); }
+  }catch(e){}
 }
 </script>
 
@@ -2498,11 +2635,7 @@ function renderReport(){
   const p = R.player || {name:R.pid, team:'', number:'', position:'', lr:''};
   const ws = num(sm.weight_shift_range);
   const sep = num(sm.separation_deg), stride = num(sm.stride_cm);
-  const rows = [
-    ['테이크백', num(sm.shoulder_takeback_deg), num(sm.pelvis_takeback_deg)],
-    ['팔로우스윙', num(sm.shoulder_follow_deg),  num(sm.pelvis_follow_deg)],
-  ];
-  const d = v => v==null ? '-' : v.toFixed(1);
+  const side = sm.bat_side==='L' ? '좌타' : sm.bat_side==='R' ? '우타' : '';
 
   const chips = Object.keys(OV_LABEL).map(k=>{
     const has = R.avail.has(k);
@@ -2512,24 +2645,17 @@ function renderReport(){
 
   const arrow = '<svg class="i" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>';
   const card = (id, title, valHTML, sub, enabled) =>
-    '<button class="mcard'+((id==='rot'||id==='meta')?' wide':'')+'"'+(enabled?' data-m="'+id+'"':' disabled')+'>'
+    '<button class="mcard"'+(enabled?' data-m="'+id+'"':' disabled')+'>'
     + '<span class="t">'+esc(title)+(enabled?arrow:'')+'</span>'
     + valHTML + (sub?'<span class="sub">'+sub+'</span>':'') + '</button>';
-
-  const rotTable = '<div class="kv" style="margin-top:auto;width:100%">'
-    + '<span class="h"></span><span class="h" style="text-align:right">어깨</span><span class="h" style="text-align:right">골반</span>'
-    + rows.map(r=>'<span class="muted">'+r[0]+'</span><span class="n">'+d(r[1])+'°</span><span class="n">'+d(r[2])+'°</span>').join('')
-    + '<span class="muted" style="border-top:1px solid var(--line2);padding-top:6px">상하체 분리</span>'
-    + '<span class="n" style="border-top:1px solid var(--line2);padding-top:6px">'+d(sep)+'°</span>'
-    + '<span class="n" style="border-top:1px solid var(--line2);padding-top:6px"></span>'
-    + '</div>';
 
   $('#reportRoot').innerHTML =
     '<div class="rgrid">'
     + '<div class="col" style="gap:14px;min-width:0">'
       + '<div class="card pad"><div class="row" style="gap:14px">'
         + '<span class="avatar" style="width:52px;height:52px;font-size:20px;background:'+esc(teamColor(p.team))+'">'+esc(initial(p.name))+'</span>'
-        + '<div class="grow" style="min-width:0"><b style="font-size:19px">'+esc(p.name)+'</b>'
+        + '<div class="grow" style="min-width:0"><div class="row" style="gap:8px"><b style="font-size:19px">'+esc(p.name)+'</b>'
+        + (side ? '<span class="pill">'+side+'</span>' : '') + '</div>'
         + '<div class="dim" style="font-size:12.5px">'+esc(p.team)+' · '+esc(p.number)+'번 · '+esc(lrText(p.lr))+'</div></div>'
         + '<div class="col" style="align-items:flex-end;gap:2px">'
         + '<span class="mono" style="font-weight:700">'+esc(R.rid)+'</span>'
@@ -2537,28 +2663,24 @@ function renderReport(){
       + '</div></div>'
       + '<div class="card pad"><div class="sect-t">영상 위에 겹쳐볼 항목</div><div class="chips" id="ovChips">'+chips+'</div>'
         + playerHTML(repPlayerFor(R))
-        + '<div class="dim" style="font-size:12px;margin-top:8px" id="vidNote">'
-        + (R.pose ? '칩을 눌러 겹쳐보기를 켜고 끕니다(전부 꺼도 됩니다). 영상은 원본 그대로 재생합니다.'
-                  : '겹쳐보기를 바꾸면 처음 한 번은 합성하느라 몇 초 걸립니다.')
-        + (impactNoteHTML()) + '</div>'
       + '</div>'
     + '</div>'
-    + '<div class="mcards">'
+    + '<div class="col" style="gap:14px;min-width:0">'
+    + memoCardHTML()
+    + '<div class="mcards compact">'
       + card('head','시선 움직임', gazeValHTML(sm), gazeNote(sm), hasSeries('head_stability'))
       + card('cs','체중이동',
              '<span class="v">'+(ws==null?'-':ws.toFixed(1))+'</span>',
              '뒷발 → 앞발 최대 이동폭', hasSeries('center_shift'))
-      + card('rot','어깨 - 골반 회전', rotTable, '', hasSeries('shoulder_hip_rotation'))
+      + card('rot','어깨 - 골반 회전',
+             '<span class="v">'+(sep==null?'-':sep.toFixed(1))+'<small>°</small></span>',
+             '상하체 최대 분리각', hasSeries('shoulder_hip_rotation'))
       + card('hand','스윙 궤적 & 히팅포인트',
              '<span class="v">'+esc(sm.swing_type||'-')+'<small> Swing</small></span>',
              R.avail.has('hand_trace')?'영상에서 확인':'분석하지 않았습니다', R.avail.has('hand_trace'))
       + card('stride','스트라이드',
              '<span class="v">'+(stride==null?'-':stride.toFixed(1))+'<small> cm</small></span>','아직 미구현', false)
-      + card('meta','분석 정보',
-             '<span class="v" style="font-size:16px;font-weight:650">'+esc(sm.bat_side==='L'?'좌타':sm.bat_side==='R'?'우타':'-')
-             + '</span>',
-             esc(R.rid), false)
-    + '</div></div>';
+    + '</div></div></div>';
 
   $$('#ovChips .chip[data-ov]').forEach(b => b.onclick = ()=>{
     const k = b.dataset.ov;
@@ -2569,18 +2691,137 @@ function renderReport(){
     } else renderReport();
   });
   $$('#reportRoot .mcard[data-m]').forEach(b => b.onclick = ()=> openDetail(b.dataset.m));
+  loadCoachComments();
+  /* 전체화면에서 고른 그래픽을 이 화면 칩에도 반영합니다 (R.sel 은 칩·플레이어가 함께 씁니다). */
+  R.repPlayer.syncSel = function(sel){
+    const before = Array.from(R.sel).sort().join(',');
+    R.sel.clear(); sel.forEach(k => R.sel.add(k));
+    $$('#ovChips .chip[data-ov]').forEach(x => x.classList.toggle('on', R.sel.has(x.dataset.ov)));
+    if (!R.pose && before !== Array.from(R.sel).sort().join(',')) loadReportVideo();   // 합성 MP4 는 다시 받아야 합니다
+  };
   loadReportVideo();
 }
 
-/* 소리로 찾은 임팩트 안내 — 있을 때만. 프레임은 사람이 읽는 1-based 로 표시한다. */
-function impactNoteHTML(){
-  const f = repImpactFrame();
-  if (f == null) return '';
-  const c = repImpactConf();
-  const conf = (c != null) ? '  · 신뢰도 ' + (c*100).toFixed(0) + '%' : '';
-  return '<div style="margin-top:6px;color:var(--accent);font-weight:600">'
-    + '⚡ 소리로 찾은 임팩트: 프레임 ' + (f+1) + conf + '</div>' + windowNoteHTML();
+/* ── 코치 메모 — 서버 API 는 feature/runpod-serverless-pipeline-20260927 의 9600eae 와 같습니다 ──
+   메모가 없으면 바로 입력칸을, 있으면 메모와 [수정] 버튼만 보여줍니다(카드가 커지지 않게).
+   [수정] 을 누르면 그 메모가 편집칸으로 바뀌고 커서가 끝에 놓여 이어서 적을 수 있습니다.
+   내용을 다 지우고 저장하면 메모가 지워지고 다시 빈 입력칸이 나옵니다. */
+function memoCardHTML(){
+  return '<div class="card pad" id="memoCard"><div class="sect-t">코치 메모</div>'
+    + '<div id="cmtList"><div class="dim" style="font-size:12.5px">불러오는 중…</div></div>'
+    + '</div>';
 }
+function memoEditorHTML(html){
+  return '<div class="memoBar">'
+    + '<button class="btn sm" data-cmd="bold" title="굵게"><b>B</b></button>'
+    + '<button class="btn sm" data-cmd="italic" title="기울임"><i>I</i></button>'
+    + '<button class="btn sm" data-cmd="underline" title="밑줄"><u>U</u></button>'
+    + '<button class="btn sm" data-cmd="h3" title="제목">제목</button>'
+    + '<button class="btn sm" data-cmd="insertUnorderedList" title="글머리 목록">• 목록</button>'
+    + '<button class="btn sm" data-cmd="blockquote" title="인용">❝ 인용</button>'
+    + '</div>'
+    + '<div class="memoEd" contenteditable="true" data-ph="이 리포트에 대한 코치 메모를 입력하세요…">'+(html||'')+'</div>';
+}
+/* host 안의 서식 버튼을 host 안의 편집칸에 연결합니다. */
+function wireMemoEditor(host){
+  const ed = host.querySelector('.memoEd');
+  host.querySelectorAll('.memoBar [data-cmd]').forEach(b => b.onmousedown = e => {
+    e.preventDefault();
+    ed.focus();
+    const cmd = b.dataset.cmd;
+    if (cmd === 'h3') document.execCommand('formatBlock', false, 'h3');
+    else if (cmd === 'blockquote') document.execCommand('formatBlock', false, 'blockquote');
+    else document.execCommand(cmd, false, null);
+  });
+  return ed;
+}
+function caretToEnd(ed){
+  ed.focus();
+  try{
+    const r = document.createRange();
+    r.selectNodeContents(ed); r.collapse(false);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  }catch(e){}
+}
+function memoURL(tail){
+  const R = S.rep;
+  return '/api/reports/'+encodeURIComponent(R.pid)+'/'+encodeURIComponent(R.rid)+'/comments'+(tail||'');
+}
+async function loadCoachComments(){
+  const R = S.rep, list = $('#cmtList');
+  if (!R || !list) return;
+  try{
+    const r = await api(memoURL());
+    if (S.rep !== R) return;
+    renderCoachComments(r.comments || []);
+  }catch(e){
+    list.innerHTML = '<div class="dim" style="font-size:12.5px">메모를 불러오지 못했습니다.</div>';
+  }
+}
+function renderCoachComments(list){
+  const el = $('#cmtList'); if (!el) return;
+  if (!list.length){
+    el.innerHTML = memoEditorHTML('')
+      + '<div class="row" style="margin-top:8px;justify-content:flex-end">'
+      + '<button class="btn sm primary" id="memoSave">메모 남기기</button></div>';
+    const ed = wireMemoEditor(el);
+    $('#memoSave').onclick = ()=> submitCoachComment(ed);
+    return;
+  }
+  el.innerHTML = list.map(c =>
+    '<div class="cmt" data-cid="'+esc(c.id)+'">'
+    + '<div class="cmtHead"><b>'+esc(c.author||'코치')+'</b>'
+    + '<span>'+esc((c.updated_at||c.created_at||'').replace('T',' ').slice(0,16))+'</span>'
+    + (c.updated_at && c.updated_at !== c.created_at ? '<span>(수정됨)</span>' : '')
+    + '<span class="acts"><button class="btn sm" data-act="edit">수정</button></span></div>'
+    + '<div class="cmtBody">'+c.html+'</div>'
+    + '</div>'
+  ).join('');
+  $$('#cmtList .cmt').forEach(node => {
+    node.querySelector('[data-act="edit"]').onclick = () => enterCommentEdit(node, node.dataset.cid);
+  });
+}
+async function submitCoachComment(ed){
+  const html = ed.innerHTML.trim();
+  if (!html || !ed.textContent.trim()){ toast('메모 내용을 입력하세요.'); return; }
+  const author = (S.user && S.user.name) || '코치';
+  try{
+    await api(memoURL(), {method:'POST', body:{author:author, html:html}});
+    toast('메모를 남겼습니다.');
+    loadCoachComments();
+  }catch(e){ toast(e.message || '메모 저장에 실패했습니다.'); }
+}
+function enterCommentEdit(node, cid){
+  const bodyEl = node.querySelector('.cmtBody');
+  const acts = node.querySelector('.cmtHead .acts');
+  if (acts) acts.hidden = true;
+  bodyEl.innerHTML = memoEditorHTML(bodyEl.innerHTML)
+    + '<div class="row" style="margin-top:8px;gap:6px">'
+    + '<span class="dim grow" style="font-size:11.5px">내용을 모두 지우고 저장하면 메모가 지워집니다.</span>'
+    + '<button class="btn sm" data-x="cancel">취소</button>'
+    + '<button class="btn sm primary" data-x="save">저장</button></div>';
+  const edEl = wireMemoEditor(bodyEl);
+  caretToEnd(edEl);
+  bodyEl.querySelector('[data-x="cancel"]').onclick = () => loadCoachComments();
+  bodyEl.querySelector('[data-x="save"]').onclick = async () => {
+    const html = edEl.innerHTML.trim();
+    if (!html || !edEl.textContent.trim()){ deleteCoachComment(cid); return; }
+    try{
+      await api(memoURL('/'+cid+'/edit'), {method:'POST', body:{html:html}});
+      toast('메모를 수정했습니다.');
+      loadCoachComments();
+    }catch(e){ toast(e.message || '수정에 실패했습니다.'); }
+  };
+}
+async function deleteCoachComment(cid){
+  if (!confirm('내용이 비어 있습니다. 이 메모를 지울까요?')) return;
+  try{
+    await api(memoURL('/'+cid+'/delete'), {method:'POST', body:{}});
+    toast('메모를 지웠습니다.');
+    loadCoachComments();
+  }catch(e){ toast(e.message || '삭제에 실패했습니다.'); }
+}
+
 /* 시선 움직임 — summary.head_gaze (metrics.compute_head_gaze). 없으면(재채점 전 리포트) '-'.
    임팩트를 못 찾은 리포트(basis='clip')는 이동량만 있고 등급(grade)이 없습니다. */
 function gazeOf(sm){
@@ -2640,7 +2881,9 @@ function playerHTML(P){
   const impMark = (impF != null && n > 1)
     ? '<span class="fimp" style="left:'+(impF/(n-1)*100).toFixed(2)+'%"></span>' : '';
   return '<div class="vidbox" style="margin-top:12px" id="'+P.box+'">'
-    + '<video id="'+P.vid+'" controls playsinline preload="auto"></video>'
+    /* 기본 전체화면 버튼은 영상만 키워 그래픽이 빠집니다 — 숨기고(크롬) 가로챕니다(사파리, wirePlayer). */
+    + '<video id="'+P.vid+'" controls playsinline webkit-playsinline preload="auto"'
+    + ' controlslist="nofullscreen noremoteplayback" disablepictureinpicture></video>'
     + '<canvas id="'+P.cid+'"></canvas>'
     + '<div class="ovl" id="'+P.ovl+'">영상 준비 중…</div></div>'
     + '<div class="fstep" id="'+P.step+'">'
@@ -2650,8 +2893,33 @@ function playerHTML(P){
       + '<button class="btn sm" data-d="1" title="1프레임 앞으로">1 ▶</button>'
       + '<button class="btn sm" data-d="5" title="5프레임 앞으로">5 ▶▶</button>'
       + impBtn
+      + '<button class="btn sm fsbtn" data-fs="1" title="그래픽을 겹친 채 전체화면">'
+      + '<svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>전체화면</button>'
     + '</div>'
-    + '<div class="fslide">'+impMark+'<input type="range" id="'+P.rng+'" min="0" max="0" value="0" step="1" aria-label="프레임 선택"></div>';
+    + '<div class="fslide">'+impMark+'<input type="range" id="'+P.rng+'" min="0" max="0" value="0" step="1" aria-label="프레임 선택"></div>'
+    + rateHTML(P);
+}
+
+/* ── 재생 속도 (1x · 1/2x · 1/4x · 1/8x) ──
+   영상을 새로 만들지 않고 브라우저가 느리게 재생합니다 — 겹쳐보기 그래픽이 그대로 따라옵니다.
+   리포트·상세·전체화면이 같은 값(S.rate)을 씁니다. */
+const RATES = [[1,'1x'], [0.5,'1/2x'], [0.25,'1/4x'], [0.125,'1/8x']];
+S.rate = 1;
+function rateHTML(P){
+  return '<div class="frate" id="'+P.p+'Rate"><span class="lbl">재생 속도</span>'
+    + RATES.map(([r, t]) => '<button class="btn sm'+(r === S.rate ? ' on' : '')+'" data-rate="'+r+'">'+t+'</button>').join('')
+    + '</div>';
+}
+function applyRate(P){
+  const v = P && pEl(P,'vid'); if (!v) return;
+  v.defaultPlaybackRate = S.rate;      // load() 를 다시 해도 유지되도록
+  v.playbackRate = S.rate;
+}
+function setRate(r){
+  S.rate = r;
+  PLAYERS.forEach(applyRate);
+  if (FS.P) applyRate(FS.P);
+  $$('.frate [data-rate]').forEach(b => b.classList.toggle('on', Number(b.dataset.rate) === r));
 }
 
 /* fps·프레임 수 — pose 가 있으면 거기서, 없으면 series.json 의 meta 에서 */
@@ -2756,13 +3024,38 @@ function wirePlayer(P){
   });
   const impBtn = host && host.querySelector('button[data-imp]');
   if (impBtn) impBtn.onclick = ()=>{ const f = repImpactFrame(); if (f != null) seekFrame(P, f); };
+  const fsBtn = host && host.querySelector('button[data-fs]');
+  if (fsBtn) fsBtn.onclick = ()=> openFs(P);
+  const rate = document.getElementById(P.p + 'Rate');
+  if (rate) rate.querySelectorAll('button[data-rate]').forEach(b => {
+    b.onclick = ()=> setRate(Number(b.dataset.rate));
+  });
   const rng = pEl(P,'rng');
   if (rng){
     const n = repFrameCount();
     if (n) rng.max = String(n - 1);
     rng.oninput = function(){ seekFrame(P, parseInt(rng.value, 10) || 0); };
   }
+  /* 사파리(아이패드·아이폰)의 기본 전체화면 버튼은 숨길 수 없어서, 눌리면 되돌리고
+     그래픽을 그리는 우리 전체화면을 엽니다. */
+  const v = pEl(P,'vid');
+  if (v && !v._fsHooked){
+    v._fsHooked = true;
+    v._player = P;
+    v.addEventListener('webkitbeginfullscreen', ()=>{
+      setTimeout(()=>{ try{ v.webkitExitFullscreen(); }catch(e){} openFs(P); }, 0);
+    });
+  }
 }
+/* 크롬·사파리(데스크톱/아이패드) — 표준 전체화면 API 로 <video> 가 전체화면이 된 경우 */
+['fullscreenchange','webkitfullscreenchange'].forEach(t => document.addEventListener(t, ()=>{
+  const el = fsElement();
+  if (el && el.tagName === 'VIDEO' && el._player){
+    const P = el._player;
+    exitBrowserFs();
+    setTimeout(()=> openFs(P), 60);
+  }
+}));
 
 /* ── 그리기 ── */
 function _X(g,p){ return g.ox + p[0]*g.s; }
@@ -2803,11 +3096,22 @@ const OVL_DRAW = {
   head_stability: function(ctx,g,d,i,meta){
     const w = repWindow();
     const s = w ? w.s : meta.skip_frames, e = w ? Math.min(i, w.e) : i;
+    /* 기준원 — 구간이 있으면 구간 안 첫 유효 좌표 */
+    const anchor = w ? (d.pts.slice(w.s, w.e+1).find(Boolean) || null) : d.anchor;
+    /* 기준 높이 — 처음 지점의 y 에 진한 회색 가로 점선 (자취보다 먼저 그려 아래에 깔립니다).
+       어두운 배경(숲·펜스)에서도 보이도록 밑에 옅은 흰 테두리를 먼저 깝니다. */
+    if (anchor){
+      const y = _Y(g,anchor);
+      ctx.save();
+      ctx.setLineDash([12*g.s, 8*g.s]); ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(g.ox, y); ctx.lineTo(g.ox + g.W*g.s, y);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 7*g.s; ctx.stroke();
+      ctx.strokeStyle = '#333333'; ctx.lineWidth = 4*g.s; ctx.stroke();
+      ctx.restore();
+    }
     if (e >= s){
       d.pts.slice(s, e+1).forEach(function(p){ if (p) _dot(ctx,g,p,'#ffc800',5); });
     }
-    /* 기준원 — 구간이 있으면 구간 안 첫 유효 좌표 */
-    const anchor = w ? (d.pts.slice(w.s, w.e+1).find(Boolean) || null) : d.anchor;
     if (anchor){
       ctx.strokeStyle = '#ff0000'; ctx.lineWidth = 2*g.s;
       ctx.beginPath(); ctx.arc(_X(g,anchor),_Y(g,anchor),30*g.s,0,TAU); ctx.stroke();
@@ -2940,7 +3244,7 @@ function loadPlayer(P){
   wirePlayer(P);
   updateFrameNum(P);
 
-  v.onloadeddata = function(){ ovl.style.display = 'none'; drawOverlays(P, true); startPlayer(P); };
+  v.onloadeddata = function(){ ovl.style.display = 'none'; applyRate(P); drawOverlays(P, true); startPlayer(P); };
   v.onseeked = function(){ drawOverlays(P, true); };
 
   if (R.pose){
@@ -2978,6 +3282,125 @@ function loadPlayer(P){
 }
 
 function loadReportVideo(){ loadPlayer(S.rep.repPlayer); }
+
+/* ═══════════ 영상 전체화면 (그래픽을 겹친 채) ═══════════
+   리포트 화면·지표 상세 어디서든 [전체화면] 을 누르면 화면 전체를 덮는 플레이어를 엽니다.
+   위: 겹쳐볼 그래픽 선택 · 닫기 / 가운데: 영상 + 그래픽 / 아래: 재생 · 속도 · 프레임 이동.
+   같은 플레이어 코드(newPlayer·loadPlayer·drawOverlays)를 'fs' 이름으로 한 벌 더 씁니다.
+   열 때 원래 플레이어의 재생 위치에서 시작하고, 닫으면 그 위치를 원래 플레이어로 돌려줍니다.
+   브라우저가 허락하면(안드로이드·아이패드·PC) 주소창까지 가리는 진짜 전체화면으로 띄웁니다. */
+const FS = { P:null, src:null, entered:false };
+
+function openFs(src){
+  const R = S.rep;
+  if (FS.P || !src || !R || !R.pid) return;
+  const sv = pEl(src,'vid');
+  const t0 = sv ? (sv.currentTime || 0) : 0;
+  const wasPlaying = !!(sv && !sv.paused && !sv.ended);
+  try{ if (sv) sv.pause(); }catch(e){}
+
+  const P = newPlayer('fs');
+  P.sel = new Set(src.sel);
+  FS.P = P; FS.src = src;
+
+  const impF = repImpactFrame(), n = repFrameCount();
+  const keys = Object.keys(OV_LABEL).filter(k => R.avail.has(k));
+  const root = $('#fsView');
+  root.innerHTML =
+      '<div class="fsbar">'
+    +   '<div class="chips" id="fsChips">'
+    +     keys.map(k => '<button class="chip'+(P.sel.has(k)?' on':'')+'" data-fov="'+k+'">'+esc(OV_LABEL[k])+'</button>').join('')
+    +   '</div>'
+    +   '<button class="btn sm" id="fsClose" aria-label="전체화면 닫기">'
+    +     '<svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 6l12 12M18 6L6 18"/></svg>닫기</button>'
+    + '</div>'
+    + '<div class="fsstage" id="'+P.box+'">'
+    +   '<video id="'+P.vid+'" playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>'
+    +   '<canvas id="'+P.cid+'"></canvas>'
+    +   '<div class="ovl" id="'+P.ovl+'">영상 준비 중…</div>'
+    + '</div>'
+    + '<div class="fsbot">'
+    +   '<div class="fslide">' + ((impF != null && n > 1)
+          ? '<span class="fimp" style="left:'+(impF/(n-1)*100).toFixed(2)+'%"></span>' : '')
+    +     '<input type="range" id="'+P.rng+'" min="0" max="0" value="0" step="1" aria-label="프레임 선택"></div>'
+    +   '<div class="fstep" id="'+P.step+'">'
+    +     '<button class="btn sm fsplay" id="fsPlay" aria-label="재생">▶</button>'
+    +     '<button class="btn sm" data-d="-5" title="5프레임 뒤로">◀◀ 5</button>'
+    +     '<button class="btn sm" data-d="-1" title="1프레임 뒤로">◀ 1</button>'
+    +     '<span class="fnum" id="'+P.num+'">-</span>'
+    +     '<button class="btn sm" data-d="1" title="1프레임 앞으로">1 ▶</button>'
+    +     '<button class="btn sm" data-d="5" title="5프레임 앞으로">5 ▶▶</button>'
+    +     (impF != null ? '<button class="btn sm imp" data-imp="1" title="소리로 찾은 임팩트로 이동">⚡ 임팩트</button>' : '')
+    +   '</div>'
+    +   rateHTML(P)
+    + '</div>';
+  root.classList.add('on');
+  document.body.classList.add('fsopen');
+
+  /* 진짜 전체화면은 사용자 터치 안에서만 허락됩니다 — 그래서 await 전에 부릅니다.
+     이미 앱 전체가 전체화면이면(상단 버튼) 그대로 두고 덮기만 합니다. */
+  FS.entered = !fsElement() && enterBrowserFs(root);
+
+  const v = pEl(P,'vid');
+  const playBtn = $('#fsPlay');
+  const syncPlay = ()=>{ playBtn.textContent = v.paused ? '▶' : '❚❚'; playBtn.setAttribute('aria-label', v.paused ? '재생' : '일시정지'); };
+  const toggle = ()=>{ if (v.paused){ if (v.ended) v.currentTime = 0; v.play().catch(()=>{}); } else v.pause(); };
+  playBtn.onclick = toggle;
+  $('#'+P.box).onclick = toggle;
+  $('#fsClose').onclick = closeFs;
+  $$('#fsChips .chip[data-fov]').forEach(b => b.onclick = ()=>{
+    const k = b.dataset.fov;
+    if (P.sel.has(k)) P.sel.delete(k); else P.sel.add(k);
+    b.classList.toggle('on', P.sel.has(k));
+    if (R.pose) drawOverlays(P, true);
+    else { const t = v.currentTime; loadPlayer(P); v.addEventListener('loadeddata', ()=>{ v.currentTime = t; }, {once:true}); }
+  });
+
+  loadPlayer(P);
+  v.addEventListener('play', syncPlay);
+  v.addEventListener('pause', syncPlay);
+  v.addEventListener('ended', syncPlay);
+  v.addEventListener('loadeddata', ()=>{
+    if (t0) v.currentTime = t0;
+    if (wasPlaying) v.play().catch(()=>{});
+  }, {once:true});
+}
+
+function closeFs(){
+  const P = FS.P, src = FS.src;
+  if (!P) return;
+  const v = pEl(P,'vid');
+  const t = v ? v.currentTime : null;
+  stopPlayer(P);
+  if (v){ try{ v.pause(); v.removeAttribute('src'); v.load(); }catch(e){} }
+  FS.P = null; FS.src = null;
+  if (FS.entered){ FS.entered = false; exitBrowserFs(); }
+  $('#fsView').classList.remove('on');
+  $('#fsView').innerHTML = '';
+  document.body.classList.remove('fsopen');
+
+  /* 고른 그래픽은 리포트 화면에만 돌려줍니다(그곳 칩이 전 항목을 다룹니다).
+     지표 상세는 그 지표에 맞춘 그래픽을 그대로 둡니다. */
+  if (src && src.syncSel) src.syncSel(P.sel);
+  const sv = src && pEl(src,'vid');
+  if (sv && t != null && sv.getAttribute('src')){
+    try{ sv.pause(); sv.currentTime = t; }catch(e){}
+    drawOverlays(src, true);
+  }
+}
+
+/* 브라우저 전체화면을 사용자가 직접 끝내면(뒤로가기·Esc·위로 쓸기) 우리 화면도 닫습니다. */
+['fullscreenchange','webkitfullscreenchange'].forEach(t => document.addEventListener(t, ()=>{
+  if (FS.P && FS.entered && !fsElement()){ FS.entered = false; closeFs(); }
+}));
+document.addEventListener('keydown', e => {
+  if (!FS.P) return;
+  const v = pEl(FS.P,'vid');
+  if (e.key === 'Escape'){ e.preventDefault(); closeFs(); }
+  else if (e.key === ' '){ e.preventDefault(); if (v){ if (v.paused) v.play().catch(()=>{}); else v.pause(); } }
+  else if (e.key === 'ArrowRight'){ e.preventDefault(); stepFrame(FS.P, e.shiftKey ? 5 : 1); }
+  else if (e.key === 'ArrowLeft'){ e.preventDefault(); stepFrame(FS.P, e.shiftKey ? -5 : -1); }
+});
 
 /* ═══════════ 지표 상세 ═══════════ */
 /* 2026-09-04: 차트 세로 마커(markerFrame)를 제거했습니다.
@@ -3139,13 +3562,7 @@ function openDetail(which){
           + '</div>'
         : '')
     + playerHTML(DP)
-    + '<div class="dim" style="font-size:12px;margin-top:8px">'
-    + (csBar
-        ? '프레임을 옮기면 그 순간의 좌우 무게중심이 아래 막대에 바로 반영됩니다.'
-        : charts.length
-          ? '프레임을 옮기면 아래 그래프의 같은 시점이 함께 표시됩니다. 그래프를 눌러도 영상이 그 프레임으로 갑니다.'
-          : '◀ ▶ 버튼과 슬라이더로 한 프레임씩 넘길 수 있습니다.')
-    + '</div></div>';
+    + '</div>';
 
   const cards = charts.map((c,i)=>
     '<div class="card pad"'+(charts.length>1?'':' style="margin-top:14px"')+'>'
@@ -3178,10 +3595,17 @@ function openDetail(which){
     + '<div class="wrapx" id="tbl-cs1"></div>'
     + '</div>';
 
-  $('#detailRoot').innerHTML = '<div class="pad maxw" style="width:100%">'
-    + '<h2 style="font-size:20px">'+esc(title)+'</h2>'
-    + '<div class="dim" style="font-size:12.5px;margin:3px 0 12px">'+esc((S.rep.player||{}).name||'')+' · '+esc(S.rep.rid)+'</div>'
-    + body + vidCard + barHtml + chartHtml + '</div>';
+  /* 넓은 화면: [영상 | 제목·설명·막대·그래프] — 영상 카드는 왼쪽에 붙어 있습니다(.dgrid, CSS).
+     좁은 화면: 제목 → 영상 → 설명·그래프. 어느 쪽이든 영상과 프레임 이동바가 한 화면에 들어옵니다. */
+  $('#detailRoot').innerHTML = '<div class="pad maxw" style="width:100%"><div class="dgrid">'
+    + '<div class="dhead"><h2 style="font-size:20px">'+esc(title)+'</h2>'
+    + '<div class="dim" style="font-size:12.5px;margin:3px 0 10px">'+esc((S.rep.player||{}).name||'')+' · '+esc(S.rep.rid)+'</div>'
+    + '</div>'
+    + '<div class="dvid">' + vidCard + '</div>'
+    + '<div class="dbar">' + barHtml + '</div>'
+    + '<div class="ddesc">' + body + '</div>'
+    + '<div class="dinfo">' + chartHtml + '</div>'
+    + '</div></div>';
 
   charts.forEach(c => wireChart($('#'+c.id), c));
 
@@ -3392,7 +3816,7 @@ $('#btnClearCache').onclick = async ()=>{
 /* 읽기 전용 — 촬영·분석·편집·서버설정으로 가는 길을 전부 막습니다. */
 .navitem[data-go="manage"],.navitem[data-go="analysis"],.navitem[data-go="settings"],
 .navitem[data-go="collect"],.navitem[data-go="clips"],
-#btnLogout,#connBox,#hpAnalyze,#hpEdit,
+#btnLogout,#connBox,#hpAnalyze,#hpEdit,#memoCard,
 .fcard[data-f="manage"],.fcard[data-f="analysis"],.fcard[data-f="collect"]{display:none!important}
 /* 기록 목록 오른쪽의 시선 움직임 등급은 숨깁니다 — 리포트를 열면 그대로 보입니다. */
 .rrow .sc{display:none!important}
